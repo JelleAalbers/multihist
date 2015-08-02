@@ -148,6 +148,7 @@ class Hist1d(MulitHistBase):
           - scale_histogram_by multiplies the histogram AND the error bars by its argument
           - plt thing to call .errorbar on (pylab, figure, axes, whatever the matplotlib guys come up with next)
         """
+        kwargs.setdefault('linestyle', 'none')
         yerr = np.sqrt(self.histogram)
         if normed:
             y = self.normed_histogram
@@ -236,7 +237,7 @@ class Hist2d(MulitHistBase):
                       bin_edges=bin_edges_other_axis)
 
     def plot(self, **kwargs):
-        plt.pcolormesh(self.bin_edges_x, self.bin_edges_y, self.histogram, **kwargs)
+        plt.pcolormesh(self.bin_edges_x, self.bin_edges_y, self.histogram.T, **kwargs)
         plt.xlim(np.min(self.bin_edges_x), np.max(self.bin_edges_x))
         plt.ylim(np.min(self.bin_edges_y), np.max(self.bin_edges_y))
         plt.colorbar()
@@ -249,8 +250,8 @@ class Hist2d(MulitHistBase):
 if __name__ == '__main__':
     # Be careful, if you don't give a range, it is auto-determined by the first data you put in!
     m = Hist1d(bins=100, range=(-3, 4))
-    m.add(np.random.normal(0, 0.5, 10**6))
-    m.add(np.random.normal(2, 0.2, 10**6))
+    m.add(np.random.normal(0, 0.5, 10**4))
+    m.add(np.random.normal(2, 0.2, 10**3))
     m.plot()
     plt.show()
 
@@ -259,4 +260,10 @@ if __name__ == '__main__':
     m2.add(np.random.normal(1, 1, 10**6), np.random.normal(1, 1, 10**6))
     m2.add(np.random.normal(-2, 1, 10**6), np.random.normal(2, 1, 10**6))
     m2.plot()
+    plt.show()
+
+    m2.projection('x').plot()
+    plt.show()
+
+    m2.projection('y').plot()
     plt.show()
