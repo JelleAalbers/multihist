@@ -71,6 +71,7 @@ test_bins_2d = 3
 
 class TestHist2d(TestCase):
 
+
     def setUp(self):
         self.m = Hist2d(range=test_range_2d, bins=test_bins_2d)
 
@@ -97,6 +98,19 @@ class TestHist2d(TestCase):
                                         range=test_range_2d,
                                         bins=test_bins_2d)[0].tolist())
 
+    def test_projection(self):
+        m = self.m
+        x = [0.1, 0.8, -0.4]
+        y = [0, 0, 0]
+        m.add(x, y)
+        p1 = m.projection('x')
+        self.assertEqual(p1.histogram.tolist(), [1, 1, 1])
+        self.assertAlmostEqual(np.sum(p1.bin_edges - np.array([-1, -1/3, 1/3, 1])), 0)
+        p2 = m.projection('y')
+        self.assertEqual(p2.histogram.tolist(), [0, 3, 0])
+        self.assertAlmostEqual(np.sum(p2.bin_edges - np.array([-1, -1/3, 1/3, 1])), 0)
+
 
 if __name__ == '__main__':
     unittest.main()
+
