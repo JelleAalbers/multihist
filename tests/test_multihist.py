@@ -1,11 +1,18 @@
+import unittest
 from unittest import TestCase
+import numpy as np
 
-from multihist import Hist1d
+from multihist import Hist1d, Hist2d
+
+
+n_bins = 100
+test_range = (-3, 4)
+
 
 class TestHist1d(TestCase):
 
     def setUp(self):
-        self.m = Hist1d(bins=100, range=(-3, 4))
+        self.m = Hist1d(bins=n_bins, range=test_range)
 
     def test_is_instance(self):
         self.assertIsInstance(self.m, Hist1d)
@@ -27,5 +34,45 @@ class TestHist1d(TestCase):
 
     def test_init_from_data(self):
         ex_data = list(range(11))
-        m = Hist1d(ex_data, bins=len(ex_data) -1)
-        self.assertEqual(m.bin_edges, ex_data)
+        m = Hist1d(ex_data, bins=len(ex_data) - 1)
+        self.assertEqual(m.bin_edges.tolist(), ex_data)
+        self.assertTrue(m.histogram.tolist(), [1]*n_bins)
+
+    def test_add_data(self):
+        m = self.m
+        m.add([0, 3, 4])
+        self.assertEqual(m.histogram.tolist(),
+                         np.histogram([0, 3, 4],
+                                      bins=n_bins, range=test_range)[0].tolist())
+        m.add([0, 3, 4])
+        self.assertEqual(m.histogram.tolist(),
+                         np.histogram([0, 3, 4]*2,
+                                      bins=n_bins, range=test_range)[0].tolist())
+        m.add([0, 3, 4, 538])
+        self.assertEqual(m.histogram.tolist(),
+                         np.histogram([0, 3, 4]*3,
+                                      bins=n_bins, range=test_range)[0].tolist())
+
+test_range_2d = ((-1, 1), (-10, 10))
+test_bins_2d = 3
+
+class TestHist2d(TestCase):
+
+    def setUp(self):
+        self.m = Hist2d(range=test_range_2d, bins=test_bins_2d)
+
+    def test_is_instance(self):
+        self.assertIsInstance(self.m, Hist2d)
+
+    def test_add_data(self):
+        m = self.m
+        x = [0.1, 0.8, -0.4]
+        y = [0, 0, 0]
+        m.add(x, y)
+        self.assertEqual(m.histogram.tolist(),
+                         np.histogram2d(y, x,
+                                        range=list(reversed(test_range_2d)),
+                                        bins=test_bins_2d)[0].tolist())
+
+if __name__ == '__main__':
+    unittest.main()

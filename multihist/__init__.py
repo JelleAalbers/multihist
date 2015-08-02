@@ -33,10 +33,10 @@ class MulitHistBase(object):
 class Hist1d(MulitHistBase):
 
     @classmethod
-    def from_histogram(cls, bin_edges, histogram):
+    def from_histogram(cls, histogram, bin_edges):
         """Make a Hist1D from a numpy bin_edges + histogram pair
-        :param bin_edges: Bin edges of histogram. Must be one longer than length of histogram
         :param histogram: Initial histogram
+        :param bin_edges: Bin edges of histogram. Must be one longer than length of histogram
         :return:
         """
         if len(bin_edges) != len(histogram) + 1:
@@ -112,66 +112,78 @@ class Hist1d(MulitHistBase):
 class Hist2d(MulitHistBase):
     """
     2D histogram object
+
+    np.histogram2d has x and y backwards, see its documentation
+    We workaround this by feeding x and y in reverse.
+    Hence we must also flip any user-specified bins and range argument
     """
 
-    def __init__(self, histogram=None, bin_edges_x=None, bin_edges_y=None, **kwargs):
+    @classmethod
+    def from_histogram(cls, histogram, bin_edges_x, bin_edges_y):
+        """Make a Hist2D from numpy histogram + bin edges x + bin edges y
+        :param histogram: Initial histogram
+        :param bin_edges_x: x bin edges of histogram.
+        :param bin_edges_y: y bin edges of histogram.
+        :return:
+        """
+        self = cls(bins=[bin_edges_x, bin_edges_y])
         self.bin_edges_x = bin_edges_x
         self.bin_edges_y = bin_edges_y
         self.histogram = histogram
-        self.kwargs = kwargs
-        # np.histogram2d has x and y backwards, see its documentation
-        # We workaround this by feeding x and y in reverse.
-        # Hence we must also flip a user-specified bins and range argument
-        for argname in ('range', 'bins'):
-            if argname in kwargs:
-                self.kwargs[argname] = list(reversed(self.kwargs[argname]))
+
+    def __init__(self, x=None, y=None, bins=10, range=None, weights=None):
+        if x is None:
+            x = []
+        if y is None:
+            y = []
+        if len(x) != len(y):
+            raise ValueError("x and y must have same length")
+        if range is not None:
+            range = list(reversed(range))
+        try:
+            if len(bins) == 2:
+                bins = list(reversed(bins))
+        except TypeError:
+            pass
+        self.histogram, self.bin_edges_y, self.bin_edges_x = np.histogram2d(y, x,
+                                                                            bins=bins,
+                                                                            weights=weights,
+                                                                            range=range)
 
     def add(self, x, y, weights=None):
-        if self.histogram is None:
-            # First time we run!
-            self.histogram, self.bin_edges_y, self.bin_edges_x = np.histogram2d(y, x,
-                                                                                weights=weights,
-                                                                                **self.kwargs)
-        else:
-            # Pass previous hist's bins instead of (a possibly present) user-defined bins
-            hist, _, _  = np.histogram2d(y, x,
-                                         bins=[self.bin_edges_y, self.bin_edges_x],
-                                         weights=weights,
-                                         **{k:v for k, v in self.kwargs.items() if k != 'bins'})
-            self.histogram += hist
+        hist, _, _ = np.histogram2d(y, x,
+                                    bins=[self.bin_edges_y, self.bin_edges_x],
+                                    weights=weights)
+        self.histogram += hist
 
     def projection(self, axis='x'):
-        return Hist1d(
-            bin_edges=(self.bin_edges_x if axis=='x' else self.bin_edges_y),
-            histogram=np.sum(self.histogram, axis=(0 if axis=='x' else 1))
-        )
+        return Hist1d.from_histogram(histogram=np.sum(self.histogram, axis=(0 if axis == 'x' else 1)),
+                                     bin_edges=(self.bin_edges_x if axis == 'x' else self.bin_edges_y))
 
     def average(self, axis='x'):
-        other_axis = 'x' if axis == 'y' else 'y'
-        bin_centers_other_axis = self.projection(other_axis).bin_centers
         bin_centers = self.projection(axis).bin_centers
+        bin_centers_other_axis = self.projection('x' if axis == 'y' else 'y').bin_centers
         hist = self.histogram if axis == 'y' else self.histogram.T
-        return bin_centers, np.array([
-            np.average(bin_centers_other_axis, weights=column) if np.sum(column) != 0 else float('nan')
-            for column in hist])
+        return Hist1d.from_histogram(histogram=np.array([np.average(bin_centers_other_axis, weights=column)
+                                                         if np.sum(column) != 0 else float('nan')
+                                                         for column in hist]),
+                                     bin_edges=bin_centers)
 
     def slice(self, start, stop=None, axis='x'):
         if stop is None:
             stop = start
-        bin_edges = (self.bin_edges_x if axis=='x' else self.bin_edges_y)
+        bin_edges = self.bin_edges_x if axis == 'x' else self.bin_edges_y
+        bin_edges_other_axis = self.bin_edges_y if axis == 'x' else self.bin_edges_x
         start_bin = np.digitize([start], bin_edges)[0]
-        stop_bin =  np.digitize([stop], bin_edges)[0]
+        stop_bin = np.digitize([stop], bin_edges)[0]
         if not (1 <= start_bin <= len(bin_edges)-1 and 1 <= stop_bin <= len(bin_edges)-1):
             raise ValueError("Slice start/stop values are not in range of histogram")
         if axis == 'x':
             hist = self.histogram.T
         else:
             hist = self.histogram
-        return Hist1d(
-            # bin_edges of the other axis
-            bin_edges=(self.bin_edges_y if axis=='x' else self.bin_edges_x),
-            histogram=np.sum(hist[start_bin-1:stop_bin], axis=0)
-        )
+        return Hist1d(histogram=np.sum(hist[start_bin - 1:stop_bin], axis=0),
+                      bin_edges=bin_edges_other_axis)
 
     def plot(self, **kwargs):
         plt.pcolormesh(self.bin_edges_x, self.bin_edges_y, self.histogram, **kwargs)
@@ -189,7 +201,7 @@ if __name__ == '__main__':
     plt.show()
 
     # Be careful, if you don't give a range, it is auto-determined by the first data you put in!
-    m2 = Hist2d(bins=100, range=[[-5,3],[-3,5]])
+    m2 = Hist2d(bins=100, range=[[-5, 3], [-3, 5]])
     m2.add(np.random.normal(1, 1, 10**6), np.random.normal(1, 1, 10**6))
     m2.add(np.random.normal(-2, 1, 10**6), np.random.normal(2, 1, 10**6))
     m2.plot()
