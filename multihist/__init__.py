@@ -20,6 +20,9 @@ class MulitHistBase(object):
     def normed_histogram(self):
         return self.histogram.astype(np.float)/self.n
 
+    # Overload binary numeric operators to work on histogram
+    # TODO: logical operators
+
     def __getitem__(self, item):
         return self.histogram[item]
 
@@ -28,6 +31,58 @@ class MulitHistBase(object):
 
     def __len__(self):
         return len(self.histogram)
+
+    def __add__(self, other):
+        return self.__class__.from_histogram(self.histogram.__add__(other), *self.bin_edges_list)
+
+    def __sub__(self, other):
+        return self.__class__.from_histogram(self.histogram.__sub__(other), *self.bin_edges_list)
+
+    def __mul__(self, other):
+        return self.__class__.from_histogram(self.histogram.__mul__(other), *self.bin_edges_list)
+
+    def __truediv__(self, other):
+        return self.__class__.from_histogram(self.histogram.__truediv__(other), *self.bin_edges_list)
+
+    def __floordiv__(self, other):
+        return self.__class__.from_histogram(self.histogram.__floordiv__(other), *self.bin_edges_list)
+
+    def __mod__(self, other):
+        return self.__class__.from_histogram(self.histogram.__mod__(other), *self.bin_edges_list)
+
+    def __divmod__(self, other):
+        return self.__class__.from_histogram(self.histogram.__divmod__(other), *self.bin_edges_list)
+
+    def __pow__(self, other):
+        return self.__class__.from_histogram(self.histogram.__pow__(other), *self.bin_edges_list)
+
+    def __lshift__(self, other):
+        return self.__class__.from_histogram(self.histogram.__lshift__(other), *self.bin_edges_list)
+
+    def __rshift__(self, other):
+        return self.__class__.from_histogram(self.histogram.__rshift__(other), *self.bin_edges_list)
+
+    def __and__(self, other):
+        return self.__class__.from_histogram(self.histogram.__and__(other), *self.bin_edges_list)
+
+    def __xor__(self, other):
+        return self.__class__.from_histogram(self.histogram.__xor__(other), *self.bin_edges_list)
+
+    def __or__(self, other):
+        return self.__class__.from_histogram(self.histogram.__or__(other), *self.bin_edges_list)
+
+    def __neg__(self):
+        return self.__class__.from_histogram(-self.histogram, *self.bin_edges_list)
+
+    def __pos__(self):
+        return self.__class__.from_histogram(+self.histogram, *self.bin_edges_list)
+
+    def __abs__(self):
+        return self.__class__.from_histogram(abs(self.histogram), *self.bin_edges_list)
+
+    def __invert__(self):
+        return self.__class__.from_histogram(~self.histogram, *self.bin_edges_list)
+
 
 
 class Hist1d(MulitHistBase):
@@ -42,7 +97,8 @@ class Hist1d(MulitHistBase):
         if len(bin_edges) != len(histogram) + 1:
             raise ValueError("Bin edges must be of length %d, you gave %d!" % (len(histogram) + 1, len(bin_edges)))
         self = cls(bins=bin_edges)
-        self.histogram = histogram
+        self.histogram = np.array(histogram)
+        return self
 
     def __init__(self, data=None, bins=10, range=None, weights=None):
         """
@@ -108,14 +164,15 @@ class Hist1d(MulitHistBase):
             **kwargs
         )
 
+    @property
+    def bin_edges_list(self):
+        return [self.bin_edges]
+
 
 class Hist2d(MulitHistBase):
     """
     2D histogram object
 
-    np.histogram2d has x and y backwards, see its documentation
-    We workaround this by feeding x and y in reverse.
-    Hence we must also flip any user-specified bins and range argument
     """
 
     @classmethod
@@ -138,26 +195,19 @@ class Hist2d(MulitHistBase):
             y = []
         if len(x) != len(y):
             raise ValueError("x and y must have same length")
-        if range is not None:
-            range = list(reversed(range))
-        try:
-            if len(bins) == 2:
-                bins = list(reversed(bins))
-        except TypeError:
-            pass
-        self.histogram, self.bin_edges_y, self.bin_edges_x = np.histogram2d(y, x,
+        self.histogram, self.bin_edges_x, self.bin_edges_y = np.histogram2d(y, x,
                                                                             bins=bins,
                                                                             weights=weights,
                                                                             range=range)
 
     def add(self, x, y, weights=None):
-        hist, _, _ = np.histogram2d(y, x,
-                                    bins=[self.bin_edges_y, self.bin_edges_x],
+        hist, _, _ = np.histogram2d(x, y,
+                                    bins=[self.bin_edges_x, self.bin_edges_y],
                                     weights=weights)
         self.histogram += hist
 
     def projection(self, axis='x'):
-        return Hist1d.from_histogram(histogram=np.sum(self.histogram, axis=(0 if axis == 'x' else 1)),
+        return Hist1d.from_histogram(histogram=np.sum(self.histogram, axis=(1 if axis == 'x' else 0)),
                                      bin_edges=(self.bin_edges_x if axis == 'x' else self.bin_edges_y))
 
     def average(self, axis='x'):
@@ -190,6 +240,10 @@ class Hist2d(MulitHistBase):
         plt.xlim(np.min(self.bin_edges_x), np.max(self.bin_edges_x))
         plt.ylim(np.min(self.bin_edges_y), np.max(self.bin_edges_y))
         plt.colorbar()
+
+    @property
+    def bin_edges_list(self):
+        return [self.bin_edges_x, self.bin_edges_y]
 
 
 if __name__ == '__main__':

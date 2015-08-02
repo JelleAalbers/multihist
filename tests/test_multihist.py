@@ -38,6 +38,11 @@ class TestHist1d(TestCase):
         self.assertEqual(m.bin_edges.tolist(), ex_data)
         self.assertTrue(m.histogram.tolist(), [1]*n_bins)
 
+    def test_init_from_histogram(self):
+        m = Hist1d.from_histogram([0, 1, 0], [0, 1, 2, 3])
+        self.assertEqual(m.histogram.tolist(), [0, 1, 0])
+        self.assertEqual(m.bin_centers.tolist(), [0.5, 1.5, 2.5])
+
     def test_add_data(self):
         m = self.m
         m.add([0, 3, 4])
@@ -52,6 +57,14 @@ class TestHist1d(TestCase):
         self.assertEqual(m.histogram.tolist(),
                          np.histogram([0, 3, 4]*3,
                                       bins=n_bins, range=test_range)[0].tolist())
+
+    def test_overload(self):
+        m = self.m
+        m.add([test_range[0]])
+        m2 = self.m + self.m
+        self.assertEqual(m2.histogram[0], [2])
+        self.assertEqual(m2.histogram[1], [0])
+        self.assertEqual(m2.bin_edges.tolist(), m.bin_edges.tolist())
 
 test_range_2d = ((-1, 1), (-10, 10))
 test_bins_2d = 3
@@ -70,9 +83,20 @@ class TestHist2d(TestCase):
         y = [0, 0, 0]
         m.add(x, y)
         self.assertEqual(m.histogram.tolist(),
-                         np.histogram2d(y, x,
-                                        range=list(reversed(test_range_2d)),
+                         np.histogram2d(x, y,
+                                        range=test_range_2d,
                                         bins=test_bins_2d)[0].tolist())
+        m.add(x, y)
+        self.assertEqual(m.histogram.tolist(),
+                         np.histogram2d(x*2, y*2,
+                                        range=test_range_2d,
+                                        bins=test_bins_2d)[0].tolist())
+        m.add(x + [99999], y + [999999])
+        self.assertEqual(m.histogram.tolist(),
+                         np.histogram2d(x*3, y*3,
+                                        range=test_range_2d,
+                                        bins=test_bins_2d)[0].tolist())
+
 
 if __name__ == '__main__':
     unittest.main()
