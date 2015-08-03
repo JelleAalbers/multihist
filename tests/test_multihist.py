@@ -69,8 +69,8 @@ class TestHist1d(TestCase):
 test_range_2d = ((-1, 1), (-10, 10))
 test_bins_2d = 3
 
-class TestHist2d(TestCase):
 
+class TestHist2d(TestCase):
 
     def setUp(self):
         self.m = Hist2d(range=test_range_2d, bins=test_bins_2d)
@@ -98,6 +98,17 @@ class TestHist2d(TestCase):
                                         range=test_range_2d,
                                         bins=test_bins_2d)[0].tolist())
 
+    def test_slice(self):
+        m = self.m
+        x = [0.1, 0.8, -0.4]
+        y = [0, 0, 0]
+        m.add(x, y)
+        s1 = m.slice(0, axis='y')
+        self.assertIsInstance(s1, Hist1d)
+        self.assertEqual(s1.histogram.tolist(), [1, 1, 1])
+        s2 = m.slice(0, axis='x')
+        self.assertEqual(s2.histogram.tolist(), [0, 1, 0])
+
     def test_projection(self):
         m = self.m
         x = [0.1, 0.8, -0.4]
@@ -113,4 +124,3 @@ class TestHist2d(TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

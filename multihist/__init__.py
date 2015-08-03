@@ -84,7 +84,6 @@ class MulitHistBase(object):
         return self.__class__.from_histogram(~self.histogram, *self.bin_edges_list)
 
 
-
 class Hist1d(MulitHistBase):
 
     @classmethod
@@ -207,13 +206,27 @@ class Hist2d(MulitHistBase):
                                     weights=weights)
         self.histogram += hist
 
+    @property
+    def bin_centers_x(self):
+        return 0.5*(self.bin_edges_x[1:] + self.bin_edges_x[:-1])
+
+    @property
+    def bin_centers_y(self):
+        return 0.5*(self.bin_edges_y[1:] + self.bin_edges_y[:-1])
+
     def projection(self, axis='x'):
-        return Hist1d.from_histogram(histogram=np.sum(self.histogram, axis=(1 if axis == 'x' else 0)),
-                                     bin_edges=(self.bin_edges_x if axis == 'x' else self.bin_edges_y))
+        """Sums all data along opposing axis, then return Hist1D
+        """
+        if axis == 'x':
+            return self.slice(self.bin_centers_y[0], self.bin_centers_y[-1], axis='y')
+        else:
+            return self.slice(self.bin_centers_x[0], self.bin_centers_x[-1], axis='x')
 
     def average(self, axis='x'):
-        bin_centers = self.projection(axis).bin_centers
-        bin_centers_other_axis = self.projection('x' if axis == 'y' else 'y').bin_centers
+        """Estimate data mean along axis, then return Hist1d
+        """
+        bin_centers = self.bin_centers_x if axis == 'x' else self.bin_edges_y
+        bin_centers_other_axis = self.bin_centers_x if axis == 'y' else self.bin_edges_y
         hist = self.histogram if axis == 'y' else self.histogram.T
         return Hist1d.from_histogram(histogram=np.array([np.average(bin_centers_other_axis, weights=column)
                                                          if np.sum(column) != 0 else float('nan')
@@ -221,6 +234,9 @@ class Hist2d(MulitHistBase):
                                      bin_edges=bin_centers)
 
     def slice(self, start, stop=None, axis='x'):
+        """Sums all bins data along axis between start and stop (both inclusive), then return Hist1d
+        If stop is not given, take a 1-bin slice over the axis.
+        """
         if stop is None:
             stop = start
         bin_edges = self.bin_edges_x if axis == 'x' else self.bin_edges_y
@@ -230,11 +246,11 @@ class Hist2d(MulitHistBase):
         if not (1 <= start_bin <= len(bin_edges)-1 and 1 <= stop_bin <= len(bin_edges)-1):
             raise ValueError("Slice start/stop values are not in range of histogram")
         if axis == 'x':
-            hist = self.histogram.T
-        else:
             hist = self.histogram
-        return Hist1d(histogram=np.sum(hist[start_bin - 1:stop_bin], axis=0),
-                      bin_edges=bin_edges_other_axis)
+        else:
+            hist = self.histogram.T
+        return Hist1d.from_histogram(histogram=np.sum(hist[start_bin - 1:stop_bin], axis=0),
+                                     bin_edges=bin_edges_other_axis)
 
     def plot(self, **kwargs):
         plt.pcolormesh(self.bin_edges_x, self.bin_edges_y, self.histogram.T, **kwargs)
