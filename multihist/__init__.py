@@ -264,22 +264,36 @@ class Hist2d(MulitHistBase):
 
 
 if __name__ == '__main__':
-    # Be careful, if you don't give a range, it is auto-determined by the first data you put in!
+    # Create a 1d histogram and add some data
     m = Hist1d(bins=100, range=(-3, 4))
     m.add(np.random.normal(0, 0.5, 10**4))
     m.add(np.random.normal(2, 0.2, 10**3))
+
+    # Get the data back out:
+    print(m.histogram, m.bin_edges)
+
+    # For plotting you might prefer bin_centers:
+    plt.plot(m.bin_centers, m.histogram)
+    plt.show()
+
+    # Or use a sensible canned plotting function
     m.plot()
     plt.show()
 
-    # Be careful, if you don't give a range, it is auto-determined by the first data you put in!
+    # You can also create histograms immediately
+    m_instant = Hist1d([0, 3, 1, 6, 2 ,9], bins=3)
+    m_instant.plot()
+    plt.show()
+
+    # Create and show a 2d histogram
     m2 = Hist2d(bins=100, range=[[-5, 3], [-3, 5]])
     m2.add(np.random.normal(1, 1, 10**6), np.random.normal(1, 1, 10**6))
     m2.add(np.random.normal(-2, 1, 10**6), np.random.normal(2, 1, 10**6))
     m2.plot()
     plt.show()
 
-    m2.projection('x').plot()
-    plt.show()
-
-    m2.projection('y').plot()
+    # Show the x and y projections
+    m2.projection('x').plot(label='x projection')
+    m2.projection('y').plot(label='y projection', linestyle=':')
+    plt.legend()
     plt.show()
