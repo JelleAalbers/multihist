@@ -1,3 +1,4 @@
+from __future__ import division
 from copy import deepcopy
 
 import numpy as np
@@ -281,7 +282,7 @@ if __name__ == '__main__':
     plt.show()
 
     # You can also create histograms immediately
-    m_instant = Hist1d([0, 3, 1, 6, 2 ,9], bins=3)
+    m_instant = Hist1d([0, 3, 1, 6, 2, 9], bins=3)
     m_instant.plot()
     plt.show()
 

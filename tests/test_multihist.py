@@ -1,9 +1,10 @@
+from __future__ import division
 import unittest
 from unittest import TestCase
+
 import numpy as np
 
 from multihist import Hist1d, Hist2d
-
 
 n_bins = 100
 test_range = (-3, 4)

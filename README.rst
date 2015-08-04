@@ -26,7 +26,7 @@ Synopsis::
     plt.show()
 
     # You can also create histograms immediately
-    m_instant = Hist1d([0, 3, 1, 6, 2 ,9], bins=3)
+    m_instant = Hist1d([0, 3, 1, 6, 2, 9], bins=3)
     m_instant.plot()
     plt.show()
 
@@ -43,4 +43,4 @@ Synopsis::
     plt.legend()
     plt.show()
 
-If you're looking for something more fancy, use ROOT: `https://root.cern.ch/root/html/TH1.html` + python bindings (pyROOT, rootpy)
+If you're looking for a more fancy histogram class, you might like / eventually get used to ROOT (`https://root.cern.ch/root/html/TH1.html`) and one of its python bindings (pyROOT, rootpy).
