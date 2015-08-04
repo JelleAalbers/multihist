@@ -58,8 +58,12 @@ Synopsis::
 
 Alternatives
 ------------
+Of course, the easiest alternative is just to use np.histogram without any wrappers.
+
 If you're looking for a more fancy histogram class, and don't mind installing a big framework,
 you might like the particle physics workhorse ROOT (`https://root.cern.ch/root/html/TH1.html`) and one of its python bindings (pyROOT, rootpy).
 
 If you do come from a ROOT background, you might appreciate pyhistogram (`https://github.com/cbourjau/pyhistogram`) instead,
 which has a much more ROOT-like interface.
+
+Another python histogram package oriented towards physics is `http://docs.danse.us/histogram/0.2.1/intro.html`. This has support for physical units in histograms and error propagation, but the interface is further removed from numpy. 

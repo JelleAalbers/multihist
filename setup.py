@@ -8,8 +8,8 @@ history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 requirements = open('requirements.txt').read().splitlines()
 test_requirements = requirements + ['flake8']
 
-setup(name='multhist',
-      version='0.1',
+setup(name='multihist',
+      version='0.1.2',
       description='Convenience wrappers around numpy histograms',
       long_description=readme + '\n\n' + history,
       author='Jelle Aalbers',
