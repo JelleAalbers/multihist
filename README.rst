@@ -1,5 +1,7 @@
 multihist
 ===========
+`https://github.com/JelleAalbers/multihist`
+
 Convenience wrappers around numpy's histogram and histogram2d.
 
 Numpy has great histogram functions, which return (histogram, bin_edges) tuples.
