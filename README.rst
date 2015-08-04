@@ -4,14 +4,18 @@ multihist
 
 Convenience wrappers around numpy's histogram and histogram2d.
 
-Numpy has great histogram functions, which return (histogram, bin_edges) tuples.
-These are a bit cumbersome to keep dragging around; adding new data to a histogram,
-and especially doing operations like slicing and projection on 2d histograms while keeping the histogram <-> bins association
-can be difficult.
+Numpy has great histogram functions, which return (histogram, bin_edges) tuples. This package wraps this tuple in a class
+with methods for adding extra data to existing histograms, slicing and projecting 2d histograms, etc.
+Convenience methods are available for getting cumulative and density information, as well as basic statistics (mean and std).
 
 Synopsis::
 
-    # Create a 1d histogram and add some data
+    from multihist import Hist1d, Hist2d
+
+    # Create histograms just like from numpy...
+    m = Hist1d([0, 3, 1, 6, 2, 9], bins=3)
+
+    # ...or add data incrementally:
     m = Hist1d(bins=100, range=(-3, 4))
     m.add(np.random.normal(0, 0.5, 10**4))
     m.add(np.random.normal(2, 0.2, 10**3))
@@ -19,17 +23,21 @@ Synopsis::
     # Get the data back out:
     print(m.histogram, m.bin_edges)
 
-    # For plotting you might prefer bin_centers:
-    plt.plot(m.bin_centers, m.histogram)
+    # Access derived quantities like bin_centers, normalized_histogram, density, cumulative_density, mean, std
+    plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", linestyle='steps')
+    plt.plot(m.bin_centers, m.density, label="Empirical PDF", linestyle='steps')
+    plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", linestyle='steps')
+    plt.title("Estimated mean %0.2f, estimated std %0.2f" % (m.mean, m.std))
+    plt.legend(loc='best')
     plt.show()
 
-    # Or use a sensible canned plotting function
+    # Slicing and arithmetic behave just like ordinary ndarrays
+    print("The fourth bin has %d entries" % m[3])
+    m[1:4] += 4 + 2 * m[-27:-24]
+    print("Now it has %d entries" % m[3])
+
+    # Of course I couldn't resist adding a canned plotting function:
     m.plot()
-    plt.show()
-
-    # You can also create histograms immediately
-    m_instant = Hist1d([0, 3, 1, 6, 2, 9], bins=3)
-    m_instant.plot()
     plt.show()
 
     # Create and show a 2d histogram
@@ -39,10 +47,16 @@ Synopsis::
     m2.plot()
     plt.show()
 
-    # Show the x and y projections
+    # x and y projections return Hist1d objects
     m2.projection('x').plot(label='x projection')
-    m2.projection('y').plot(label='y projection', linestyle=':')
+    m2.projection('y').plot(label='y projection')
     plt.legend()
     plt.show()
 
-If you're looking for a more fancy histogram class, you might like / eventually get used to ROOT (`https://root.cern.ch/root/html/TH1.html`) and one of its python bindings (pyROOT, rootpy).
+Alternatives
+------------
+If you're looking for a more fancy histogram class, and don't mind installing a big framework,
+you might like the particle physics workhorse ROOT (`https://root.cern.ch/root/html/TH1.html`) and one of its python bindings (pyROOT, rootpy).
+
+If you do come from a ROOT background, you might appreciate pyhistogram (`https://github.com/cbourjau/pyhistogram`) instead,
+which has a much more ROOT-like interface. This package is more like numpy (as it's just a thin wrapper around numpy).

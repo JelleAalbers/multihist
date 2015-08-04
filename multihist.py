@@ -17,10 +17,6 @@ class MulitHistBase(object):
         """Returns number of data points loaded into histogram"""
         return np.sum(self.histogram)
 
-    @property
-    def normed_histogram(self):
-        return self.histogram.astype(np.float)/self.n
-
     # Overload binary numeric operators to work on histogram
     # TODO: logical operators
 
@@ -121,12 +117,25 @@ class Hist1d(MulitHistBase):
         return 0.5*(self.bin_edges[1:] + self.bin_edges[:-1])
 
     @property
-    def cumulative_histogram(self):
-        return np.cumsum(self.histogram)
+    def density(self):
+        """Gives emprical PDF, like np.histogram(...., density=True)"""
+        h = self.histogram.astype(np.float)
+        bindifs = np.array(np.diff(self.bin_edges), float)
+        return h/(bindifs * self.n)
 
     @property
-    def normed_cumulative_histogram(self):
-        return np.cumsum(self.normed_histogram)
+    def normalized_histogram(self):
+        """Gives histogram with sum of entries normalized to 1."""
+        return self.histogram/self.n
+
+    @property
+    def cumulative_histogram(self):
+        return np.cumsum(self.normalized_histogram)
+
+    @property
+    def cumulative_density(self):
+        cs = np.cumsum(self.histogram)
+        return cs/cs[-1]
 
     def items(self):
         """Iterate over (bin_center, hist_value) from left to right"""
@@ -134,13 +143,18 @@ class Hist1d(MulitHistBase):
 
     @property
     def mean(self):
-        """Estimates mean of underlying data, assuming each datapoint was exactly in the center of a bin"""
+        """Estimates mean of underlying data, assuming each datapoint was exactly in the center of its bin."""
         return np.average(self.bin_centers, weights=self.histogram)
 
     @property
-    def std(self):
-        """Estimates std of underlying data, assuming each datapoint was exactly in the center of a bin"""
-        return np.sqrt(np.average((self.bin_centers-self.mean)**2, weights=self.histogram))
+    def std(self, bessel_correction=True):
+        """Estimates std of underlying data, assuming each datapoint was exactly in the center of its bin."""
+        if bessel_correction:
+            n = self.n
+            bc = n/(n-1)
+        else:
+            bc = 1
+        return np.sqrt(np.average((self.bin_centers-self.mean)**2, weights=self.histogram)) * bc
 
     def plot(self, normed=False, scale_errors_by=1.0, scale_histogram_by=1.0, plt=plt, **kwargs):
         """Plots the histogram with Poisson (sqrt(n)) error bars
@@ -265,7 +279,10 @@ class Hist2d(MulitHistBase):
 
 
 if __name__ == '__main__':
-    # Create a 1d histogram and add some data
+    # Create histograms just like from numpy...
+    m = Hist1d([0, 3, 1, 6, 2, 9], bins=3)
+
+    # ...or add data incrementally:
     m = Hist1d(bins=100, range=(-3, 4))
     m.add(np.random.normal(0, 0.5, 10**4))
     m.add(np.random.normal(2, 0.2, 10**3))
@@ -273,17 +290,21 @@ if __name__ == '__main__':
     # Get the data back out:
     print(m.histogram, m.bin_edges)
 
-    # For plotting you might prefer bin_centers:
-    plt.plot(m.bin_centers, m.histogram)
+    # Access derived quantities like bin_centers, normalized_histogram, density, cumulative_density, mean, std
+    plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", linestyle='steps')
+    plt.plot(m.bin_centers, m.density, label="Empirical PDF", linestyle='steps')
+    plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", linestyle='steps')
+    plt.title("Estimated mean %0.2f, estimated std %0.2f" % (m.mean, m.std))
+    plt.legend(loc='best')
     plt.show()
 
-    # Or use a sensible canned plotting function
+    # Slicing and arithmetic behave just like ordinary ndarrays
+    print("The fourth bin has %d entries" % m[3])
+    m[1:4] += 4 + 2 * m[-27:-24]
+    print("Now it has %d entries" % m[3])
+
+    # Of course I couldn't resist adding a canned plotting function:
     m.plot()
-    plt.show()
-
-    # You can also create histograms immediately
-    m_instant = Hist1d([0, 3, 1, 6, 2, 9], bins=3)
-    m_instant.plot()
     plt.show()
 
     # Create and show a 2d histogram
@@ -293,8 +314,8 @@ if __name__ == '__main__':
     m2.plot()
     plt.show()
 
-    # Show the x and y projections
+    # x and y projections return Hist1d objects
     m2.projection('x').plot(label='x projection')
-    m2.projection('y').plot(label='y projection', linestyle=':')
+    m2.projection('y').plot(label='y projection')
     plt.legend()
     plt.show()
