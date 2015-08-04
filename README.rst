@@ -10,6 +10,9 @@ You can also access cumulative and density information, as well as basic statist
 
 Synopsis::
 
+    import numpy as np
+    from matplotlib import pyplot as plt
+
     from multihist import Hist1d, Hist2d
 
     # Create histograms just like from numpy...
