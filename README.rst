@@ -2,11 +2,11 @@ multihist
 ===========
 `https://github.com/JelleAalbers/multihist`
 
-Convenience wrappers around numpy's histogram and histogram2d.
+Thin wrapper around numpy's histogram and histogram2d.
 
-Numpy has great histogram functions, which return (histogram, bin_edges) tuples. This package wraps this tuple in a class
-with methods for adding extra data to existing histograms, slicing and projecting 2d histograms, etc.
-Convenience methods are available for getting cumulative and density information, as well as basic statistics (mean and std).
+Numpy has great histogram functions, which return (histogram, bin_edges) tuples. This package wraps these in a class
+with methods for adding new data to existing histograms, slicing and projecting 2d histograms, etc.
+You can also access cumulative and density information, as well as basic statistics (mean and std).
 
 Synopsis::
 
@@ -59,4 +59,4 @@ If you're looking for a more fancy histogram class, and don't mind installing a 
 you might like the particle physics workhorse ROOT (`https://root.cern.ch/root/html/TH1.html`) and one of its python bindings (pyROOT, rootpy).
 
 If you do come from a ROOT background, you might appreciate pyhistogram (`https://github.com/cbourjau/pyhistogram`) instead,
-which has a much more ROOT-like interface. This package is more like numpy (as it's just a thin wrapper around numpy).
+which has a much more ROOT-like interface.
