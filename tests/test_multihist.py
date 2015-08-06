@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from multihist import Hist1d, Hist2d
+from multihist import Hist1d, Histdd
 
 n_bins = 100
 test_range = (-3, 4)
@@ -71,13 +71,13 @@ test_range_2d = ((-1, 1), (-10, 10))
 test_bins_2d = 3
 
 
-class TestHist2d(TestCase):
+class TestHistdd(TestCase):
 
     def setUp(self):
-        self.m = Hist2d(range=test_range_2d, bins=test_bins_2d)
+        self.m = Histdd(range=test_range_2d, bins=test_bins_2d, axis_names=['foo', 'bar'])
 
     def test_is_instance(self):
-        self.assertIsInstance(self.m, Hist2d)
+        self.assertIsInstance(self.m, Histdd)
 
     def test_add_data(self):
         m = self.m
@@ -90,37 +90,29 @@ class TestHist2d(TestCase):
                                         bins=test_bins_2d)[0].tolist())
         m.add(x, y)
         self.assertEqual(m.histogram.tolist(),
+                         (np.histogram2d(x*2, y*2,
+                                         range=test_range_2d,
+                                         bins=test_bins_2d)[0].tolist()))
+        m.add([999, 999], [111, 111])
+        self.assertEqual(m.histogram.tolist(),
                          np.histogram2d(x*2, y*2,
                                         range=test_range_2d,
                                         bins=test_bins_2d)[0].tolist())
-        m.add(x + [99999], y + [999999])
-        self.assertEqual(m.histogram.tolist(),
-                         np.histogram2d(x*3, y*3,
-                                        range=test_range_2d,
-                                        bins=test_bins_2d)[0].tolist())
-
-    def test_slice(self):
-        m = self.m
-        x = [0.1, 0.8, -0.4]
-        y = [0, 0, 0]
-        m.add(x, y)
-        s1 = m.slice(0, axis='y')
-        self.assertIsInstance(s1, Hist1d)
-        self.assertEqual(s1.histogram.tolist(), [1, 1, 1])
-        s2 = m.slice(0, axis='x')
-        self.assertEqual(s2.histogram.tolist(), [0, 1, 0])
 
     def test_projection(self):
         m = self.m
         x = [0.1, 0.8, -0.4]
         y = [0, 0, 0]
         m.add(x, y)
-        p1 = m.projection('x')
+        p1 = m.projection(0)
         self.assertEqual(p1.histogram.tolist(), [1, 1, 1])
         self.assertAlmostEqual(np.sum(p1.bin_edges - np.array([-1, -1/3, 1/3, 1])), 0)
-        p2 = m.projection('y')
+        p2 = m.projection(1)
         self.assertEqual(p2.histogram.tolist(), [0, 3, 0])
         self.assertAlmostEqual(np.sum(p2.bin_edges - np.array([-1, -1/3, 1/3, 1])), 0)
+        p_2 = m.projection('bar')
+        self.assertEqual(p2.histogram.tolist(), p_2.histogram.tolist())
+        self.assertEqual(p2.bin_edges.tolist(), p_2.bin_edges.tolist())
 
 
 if __name__ == '__main__':

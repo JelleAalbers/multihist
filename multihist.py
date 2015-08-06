@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class MulitHistBase(object):
+class MultiHistBase(object):
 
     def similar_blank_hist(self):
         newhist = deepcopy(self)
@@ -30,64 +30,66 @@ class MulitHistBase(object):
         return len(self.histogram)
 
     def __add__(self, other):
-        return self.__class__.from_histogram(self.histogram.__add__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__add__(other), self.bin_edges, self.axis_names)
 
     def __sub__(self, other):
-        return self.__class__.from_histogram(self.histogram.__sub__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__sub__(other), self.bin_edges, self.axis_names)
 
     def __mul__(self, other):
-        return self.__class__.from_histogram(self.histogram.__mul__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__mul__(other), self.bin_edges, self.axis_names)
 
     def __truediv__(self, other):
-        return self.__class__.from_histogram(self.histogram.__truediv__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__truediv__(other), self.bin_edges, self.axis_names)
 
     def __floordiv__(self, other):
-        return self.__class__.from_histogram(self.histogram.__floordiv__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__floordiv__(other), self.bin_edges, self.axis_names)
 
     def __mod__(self, other):
-        return self.__class__.from_histogram(self.histogram.__mod__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__mod__(other), self.bin_edges, self.axis_names)
 
     def __divmod__(self, other):
-        return self.__class__.from_histogram(self.histogram.__divmod__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__divmod__(other), self.bin_edges, self.axis_names)
 
     def __pow__(self, other):
-        return self.__class__.from_histogram(self.histogram.__pow__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__pow__(other), self.bin_edges, self.axis_names)
 
     def __lshift__(self, other):
-        return self.__class__.from_histogram(self.histogram.__lshift__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__lshift__(other), self.bin_edges, self.axis_names)
 
     def __rshift__(self, other):
-        return self.__class__.from_histogram(self.histogram.__rshift__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__rshift__(other), self.bin_edges, self.axis_names)
 
     def __and__(self, other):
-        return self.__class__.from_histogram(self.histogram.__and__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__and__(other), self.bin_edges, self.axis_names)
 
     def __xor__(self, other):
-        return self.__class__.from_histogram(self.histogram.__xor__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__xor__(other), self.bin_edges, self.axis_names)
 
     def __or__(self, other):
-        return self.__class__.from_histogram(self.histogram.__or__(other), *self.bin_edges_list)
+        return self.__class__.from_histogram(self.histogram.__or__(other), self.bin_edges, self.axis_names)
 
     def __neg__(self):
-        return self.__class__.from_histogram(-self.histogram, *self.bin_edges_list)
+        return self.__class__.from_histogram(-self.histogram, self.bin_edges, self.axis_names)
 
     def __pos__(self):
-        return self.__class__.from_histogram(+self.histogram, *self.bin_edges_list)
+        return self.__class__.from_histogram(+self.histogram, self.bin_edges, self.axis_names)
 
     def __abs__(self):
-        return self.__class__.from_histogram(abs(self.histogram), *self.bin_edges_list)
+        return self.__class__.from_histogram(abs(self.histogram), self.bin_edges, self.axis_names)
 
     def __invert__(self):
-        return self.__class__.from_histogram(~self.histogram, *self.bin_edges_list)
+        return self.__class__.from_histogram(~self.histogram, self.bin_edges, self.axis_names)
 
 
-class Hist1d(MulitHistBase):
+class Hist1d(MultiHistBase):
+    axis_names = None
 
     @classmethod
-    def from_histogram(cls, histogram, bin_edges):
+    def from_histogram(cls, histogram, bin_edges, axis_names=None):
         """Make a Hist1D from a numpy bin_edges + histogram pair
         :param histogram: Initial histogram
         :param bin_edges: Bin edges of histogram. Must be one longer than length of histogram
+        :param axis_names: Ignored. Sorry :-)
         :return:
         """
         if len(bin_edges) != len(histogram) + 1:
@@ -179,103 +181,117 @@ class Hist1d(MulitHistBase):
             **kwargs
         )
 
-    @property
-    def bin_edges_list(self):
-        return [self.bin_edges]
 
-
-class Hist2d(MulitHistBase):
-    """
-    2D histogram object
-
+class Histdd(MultiHistBase):
+    """multidimensional histogram object
     """
 
     @classmethod
-    def from_histogram(cls, histogram, bin_edges_x, bin_edges_y):
-        """Make a Hist2D from numpy histogram + bin edges x + bin edges y
+    def from_histogram(cls, histogram, bin_edges, axis_names=None):
+        """Make a HistdD from numpy histogram + bin edges
         :param histogram: Initial histogram
-        :param bin_edges_x: x bin edges of histogram.
-        :param bin_edges_y: y bin edges of histogram.
-        :return:
+        :param bin_edges: x bin edges of histogram, y bin edges, ...
+        :return: Histnd instance
         """
-        self = cls(bins=[bin_edges_x, bin_edges_y])
-        self.bin_edges_x = bin_edges_x
-        self.bin_edges_y = bin_edges_y
+        bin_edges = np.array(bin_edges)
+        self = cls(bins=bin_edges, axis_names=axis_names)
         self.histogram = histogram
+        return self
 
-    def __init__(self, x=None, y=None, bins=10, range=None, weights=None):
-        if x is None:
-            x = []
-        if y is None:
-            y = []
-        if len(x) != len(y):
-            raise ValueError("x and y must have same length")
-        self.histogram, self.bin_edges_x, self.bin_edges_y = np.histogram2d(y, x,
-                                                                            bins=bins,
-                                                                            weights=weights,
-                                                                            range=range)
+    def __init__(self, *data, bins=10, range=None, weights=None, axis_names=None):
+        if len(data) == 0:
+            if range is None:
+                if bins is None:
+                    raise ValueError("Must specify data, bins, or range")
+                try:
+                    dimensions = len(bins)
+                except TypeError:
+                    raise ValueError("If you specify no data and no ranges, must specify a bin specification "
+                                     "which tells me what dimension you want. E.g. [10, 10, 10] instead of 10.")
+            else:
+                dimensions = len(range)
+            data = np.zeros((0, dimensions)).T
+        self.histogram, self.bin_edges = np.histogramdd(np.array(data).T, bins=bins, weights=weights, range=range)
+        self.axis_names = axis_names
 
-    def add(self, x, y, weights=None):
-        hist, _, _ = np.histogram2d(x, y,
-                                    bins=[self.bin_edges_x, self.bin_edges_y],
-                                    weights=weights)
-        self.histogram += hist
-
-    @property
-    def bin_centers_x(self):
-        return 0.5*(self.bin_edges_x[1:] + self.bin_edges_x[:-1])
+    def add(self, *data, weights=None):
+        self.histogram += np.histogramdd(np.array(data).T, bins=self.bin_edges, weights=weights)[0]
 
     @property
-    def bin_centers_y(self):
-        return 0.5*(self.bin_edges_y[1:] + self.bin_edges_y[:-1])
+    def dimensions(self):
+        return len(self.bin_edges)
 
-    def projection(self, axis='x'):
-        """Sums all data along opposing axis, then return Hist1D
-        """
-        if axis == 'x':
-            return self.slice(self.bin_centers_y[0], self.bin_centers_y[-1], axis='y')
-        else:
-            return self.slice(self.bin_centers_x[0], self.bin_centers_x[-1], axis='x')
+    def get_axis_number(self, axis):
+        if self.axis_names is None:
+            return axis
+        if axis in self.axis_names:
+            return self.axis_names.index(axis)
+        return axis
 
-    def average(self, axis='x'):
-        """Estimate data mean along axis, then return Hist1d
-        """
-        bin_centers = self.bin_centers_x if axis == 'x' else self.bin_edges_y
-        bin_centers_other_axis = self.bin_centers_x if axis == 'y' else self.bin_edges_y
-        hist = self.histogram if axis == 'y' else self.histogram.T
-        return Hist1d.from_histogram(histogram=np.array([np.average(bin_centers_other_axis, weights=column)
-                                                         if np.sum(column) != 0 else float('nan')
-                                                         for column in hist]),
-                                     bin_edges=bin_centers)
+    def other_axes(self, axis):
+        axis = self.get_axis_number(axis)
+        return tuple([i for i in range(self.dimensions) if i != axis])
 
-    def slice(self, start, stop=None, axis='x'):
-        """Sums all bins data along axis between start and stop (both inclusive), then return Hist1d
-        If stop is not given, take a 1-bin slice over the axis.
-        """
-        if stop is None:
-            stop = start
-        bin_edges = self.bin_edges_x if axis == 'x' else self.bin_edges_y
-        bin_edges_other_axis = self.bin_edges_y if axis == 'x' else self.bin_edges_x
+    def axis_names_without(self, axis):
+        """Return axis names without axis, or None if axis_names is None"""
+        if self.axis_names is None:
+            return None
+        return self.axis_names[self.other_axes(axis)]
+
+    @property
+    def bin_centers(self, axis=0):
+        """Return bin centers along an axis, or if axis=None, list of bin_centers along each axis"""
+        axis = self.get_axis_number(axis)
+        if axis is None:
+            return np.array([self.bin_centers(i) for i in range(self.dimensions)])
+        return 0.5*(self.bin_edges[axis, 1:] + self.bin_edges[axis, :-1])
+
+    def projection(self, axis=0):
+        """Sums all data along all other axes, then return Hist1D"""
+        axis = self.get_axis_number(axis)
+        projected_hist = np.sum(self.histogram, axis=self.other_axes(axis))
+        return Hist1d.from_histogram(projected_hist, bin_edges=self.bin_edges[axis])
+
+    def average(self, axis=0):
+        """Return d-1 dimensional histogram of (estimated) mean value of axis"""
+        axis = self.get_axis_number(axis)
+        meshgrid = np.meshgrid(*self.bin_centers)
+        avg_hist = np.average(meshgrid[axis], weights=self.histogram, axis=axis)
+        return Histdd.from_histogram(histogram=avg_hist,
+                                     bin_edges=self.bin_centers[self.other_axes(axis)],
+                                     axis_names=self.axis_names_without(axis))
+
+    def sum(self, axis=0):
+        """Sums all data along axis, returns d-1 dimensional histogram"""
+        axis = self.get_axis_number(axis)
+        return Histdd.from_histogram(np.sum(self.histogram, axis=axis),
+                                     bin_edges=self.bin_edges[self.other_axes(axis)],
+                                     axis_names=self.axis_names_without(axis))
+
+    def slice(self, start, stop, axis='x'):
+        """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
+        (both inclusive). Returns d dimensional histogram."""
+        axis = self.get_axis_number(axis)
+        bin_edges = self.bin_edges[axis]
         start_bin = np.digitize([start], bin_edges)[0]
         stop_bin = np.digitize([stop], bin_edges)[0]
         if not (1 <= start_bin <= len(bin_edges)-1 and 1 <= stop_bin <= len(bin_edges)-1):
             raise ValueError("Slice start/stop values are not in range of histogram")
-        if axis == 'x':
-            hist = self.histogram
-        else:
-            hist = self.histogram.T
-        return Hist1d.from_histogram(histogram=np.sum(hist[start_bin - 1:stop_bin], axis=0),
-                                     bin_edges=bin_edges_other_axis)
+        new_bin_edges = bin_edges.copy()
+        new_bin_edges[axis] = new_bin_edges[start_bin:stop_bin+2]   # TODO: Test off by one here!
+        return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1)),
+                                     bin_edges=new_bin_edges, axis_names=self.axis_names)
 
     def plot(self, **kwargs):
-        plt.pcolormesh(self.bin_edges_x, self.bin_edges_y, self.histogram.T, **kwargs)
-        plt.xlim(np.min(self.bin_edges_x), np.max(self.bin_edges_x))
-        plt.ylim(np.min(self.bin_edges_y), np.max(self.bin_edges_y))
-        plt.colorbar()
-
-    @property
-    def bin_edges_list(self):
-        return [self.bin_edges_x, self.bin_edges_y]
+        if self.dimensions == 1:
+            Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot()
+        elif self.dimensions == 2:
+            plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
+            plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
+            plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
+            plt.colorbar()
+        else:
+            raise ValueError("Can only plot 1- or 2-dimensional histograms!")
 
 
 if __name__ == '__main__':
@@ -307,8 +323,8 @@ if __name__ == '__main__':
     m.plot()
     plt.show()
 
-    # Create and show a 2d histogram
-    m2 = Hist2d(bins=100, range=[[-5, 3], [-3, 5]])
+    # Create and show a 2d histogram. Axis names are optional.
+    m2 = Histdd(bins=100, range=[[-5, 3], [-3, 5]], axis_names=['x', 'y'])
     m2.add(np.random.normal(1, 1, 10**6), np.random.normal(1, 1, 10**6))
     m2.add(np.random.normal(-2, 1, 10**6), np.random.normal(2, 1, 10**6))
     m2.plot()
@@ -316,6 +332,6 @@ if __name__ == '__main__':
 
     # x and y projections return Hist1d objects
     m2.projection('x').plot(label='x projection')
-    m2.projection('y').plot(label='y projection')
+    m2.projection(1).plot(label='y projection')
     plt.legend()
     plt.show()

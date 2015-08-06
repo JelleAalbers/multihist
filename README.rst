@@ -2,18 +2,15 @@ multihist
 ===========
 `https://github.com/JelleAalbers/multihist`
 
-Thin wrapper around numpy's histogram and histogram2d.
+Thin wrapper around numpy's histogram and histogramdd.
 
 Numpy has great histogram functions, which return (histogram, bin_edges) tuples. This package wraps these in a class
-with methods for adding new data to existing histograms, slicing and projecting 2d histograms, etc.
-You can also access cumulative and density information, as well as basic statistics (mean and std).
+with methods for adding new data to existing histograms, take averages, projecting, etc.
+
+For 1-dimensional histograms you can access cumulative and density information, as well as basic statistics (mean and std).
+For d-dimensional histograms you can name the axes, and refer to them by their names when projecting / summing / averaging.
 
 Synopsis::
-
-    import numpy as np
-    from matplotlib import pyplot as plt
-
-    from multihist import Hist1d, Hist2d
 
     # Create histograms just like from numpy...
     m = Hist1d([0, 3, 1, 6, 2, 9], bins=3)
@@ -43,8 +40,8 @@ Synopsis::
     m.plot()
     plt.show()
 
-    # Create and show a 2d histogram
-    m2 = Hist2d(bins=100, range=[[-5, 3], [-3, 5]])
+    # Create and show a 2d histogram. Axis names are optional.
+    m2 = Histdd(bins=100, range=[[-5, 3], [-3, 5]], axis_names=['x', 'y'])
     m2.add(np.random.normal(1, 1, 10**6), np.random.normal(1, 1, 10**6))
     m2.add(np.random.normal(-2, 1, 10**6), np.random.normal(2, 1, 10**6))
     m2.plot()
@@ -52,9 +49,10 @@ Synopsis::
 
     # x and y projections return Hist1d objects
     m2.projection('x').plot(label='x projection')
-    m2.projection('y').plot(label='y projection')
+    m2.projection(1).plot(label='y projection')
     plt.legend()
     plt.show()
+
 
 Alternatives
 ------------
