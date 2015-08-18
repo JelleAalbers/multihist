@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+from operator import itemgetter
 
 class MultiHistBase(object):
 
@@ -236,15 +236,14 @@ class Histdd(MultiHistBase):
         """Return axis names without axis, or None if axis_names is None"""
         if self.axis_names is None:
             return None
-        return self.axis_names[self.other_axes(axis)]
+        return itemgetter(*self.other_axes(axis))(self.axis_names)
 
-    @property
-    def bin_centers(self, axis=0):
+    def bin_centers(self, axis=None):
         """Return bin centers along an axis, or if axis=None, list of bin_centers along each axis"""
         axis = self.get_axis_number(axis)
         if axis is None:
-            return np.array([self.bin_centers(i) for i in range(self.dimensions)])
-        return 0.5*(self.bin_edges[axis, 1:] + self.bin_edges[axis, :-1])
+            return np.array([self.bin_centers(axis=i) for i in range(self.dimensions)])
+        return 0.5*(self.bin_edges[axis][1:] + self.bin_edges[axis][:-1])
 
     def projection(self, axis=0):
         """Sums all data along all other axes, then return Hist1D"""
@@ -255,17 +254,18 @@ class Histdd(MultiHistBase):
     def average(self, axis=0):
         """Return d-1 dimensional histogram of (estimated) mean value of axis"""
         axis = self.get_axis_number(axis)
-        meshgrid = np.meshgrid(*self.bin_centers)
+        meshgrid = np.meshgrid(*self.bin_centers())
         avg_hist = np.average(meshgrid[axis], weights=self.histogram, axis=axis)
         return Histdd.from_histogram(histogram=avg_hist,
-                                     bin_edges=self.bin_centers[self.other_axes(axis)],
+                                     bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                      axis_names=self.axis_names_without(axis))
 
     def sum(self, axis=0):
         """Sums all data along axis, returns d-1 dimensional histogram"""
         axis = self.get_axis_number(axis)
+        itemgetter(*self.other_axes(axis))(self.bin_edges)
         return Histdd.from_histogram(np.sum(self.histogram, axis=axis),
-                                     bin_edges=self.bin_edges[self.other_axes(axis)],
+                                     bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                      axis_names=self.axis_names_without(axis))
 
     def slice(self, start, stop, axis='x'):
@@ -277,9 +277,9 @@ class Histdd(MultiHistBase):
         stop_bin = np.digitize([stop], bin_edges)[0]
         if not (1 <= start_bin <= len(bin_edges)-1 and 1 <= stop_bin <= len(bin_edges)-1):
             raise ValueError("Slice start/stop values are not in range of histogram")
-        new_bin_edges = bin_edges.copy()
-        new_bin_edges[axis] = new_bin_edges[start_bin:stop_bin+2]   # TODO: Test off by one here!
-        return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1)),
+        new_bin_edges = self.bin_edges.copy()
+        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin+2]   # TODO: Test off by one here!
+        return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
                                      bin_edges=new_bin_edges, axis_names=self.axis_names)
 
     def plot(self, **kwargs):
