@@ -254,19 +254,28 @@ class Histdd(MultiHistBase):
     def average(self, axis=0):
         """Return d-1 dimensional histogram of (estimated) mean value of axis"""
         axis = self.get_axis_number(axis)
-        meshgrid = np.meshgrid(*self.bin_centers())
-        avg_hist = np.average(meshgrid[axis], weights=self.histogram, axis=axis)
-        return Histdd.from_histogram(histogram=avg_hist,
-                                     bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
-                                     axis_names=self.axis_names_without(axis))
+        # Arcane hack that seems to work, at least in 3d... hope
+        axis_coordinates = np.meshgrid(*self.bin_centers(), indexing='ij')[axis]
+        avg_hist = np.ma.average(axis_coordinates, weights=self.histogram, axis=axis)
+        if self.dimensions == 2:
+            new_hist = Hist1d
+        else:
+            new_hist = Histdd
+        return new_hist.from_histogram(histogram=avg_hist,
+                                       bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
+                                       axis_names=self.axis_names_without(axis))
 
     def sum(self, axis=0):
         """Sums all data along axis, returns d-1 dimensional histogram"""
         axis = self.get_axis_number(axis)
         itemgetter(*self.other_axes(axis))(self.bin_edges)
-        return Histdd.from_histogram(np.sum(self.histogram, axis=axis),
-                                     bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
-                                     axis_names=self.axis_names_without(axis))
+        if self.dimensions == 2:
+            new_hist = Hist1d
+        else:
+            new_hist = Histdd
+        return new_hist.from_histogram(np.sum(self.histogram, axis=axis),
+                                       bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
+                                       axis_names=self.axis_names_without(axis))
 
     def slice(self, start, stop, axis='x'):
         """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
