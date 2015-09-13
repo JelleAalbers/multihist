@@ -1,5 +1,9 @@
 multihist
 ===========
+
+.. image:: https://travis-ci.org/JelleAalbers/multihist.svg?branch=master
+    :target: https://travis-ci.org/JelleAalbers/multihist
+
 `https://github.com/JelleAalbers/multihist`
 
 Thin wrapper around numpy's histogram and histogramdd.
