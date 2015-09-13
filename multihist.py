@@ -198,24 +198,31 @@ class Histdd(MultiHistBase):
         self.histogram = histogram
         return self
 
-    def __init__(self, *data, bins=10, range=None, weights=None, axis_names=None):
+    def __init__(self, *data, **kwargs):
+        for k, v in {'bins': 10, 'range': None, 'weights': None, 'axis_names': None}.items():
+            kwargs.setdefault(k, v)
+    
         if len(data) == 0:
-            if range is None:
-                if bins is None:
+            if kwargs['range'] is None:
+                if kwargs['bins'] is None:
                     raise ValueError("Must specify data, bins, or range")
                 try:
-                    dimensions = len(bins)
+                    dimensions = len(kwargs['bins'])
                 except TypeError:
                     raise ValueError("If you specify no data and no ranges, must specify a bin specification "
                                      "which tells me what dimension you want. E.g. [10, 10, 10] instead of 10.")
             else:
-                dimensions = len(range)
+                dimensions = len(kwargs['range'])
             data = np.zeros((0, dimensions)).T
-        self.histogram, self.bin_edges = np.histogramdd(np.array(data).T, bins=bins, weights=weights, range=range)
-        self.axis_names = axis_names
+        self.histogram, self.bin_edges = np.histogramdd(np.array(data).T, 
+                                                        bins=kwargs['bins'], 
+                                                        weights=kwargs['weights'], 
+                                                        range=kwargs['range'])
+        self.axis_names = kwargs['axis_names']
 
-    def add(self, *data, weights=None):
-        self.histogram += np.histogramdd(np.array(data).T, bins=self.bin_edges, weights=weights)[0]
+    def add(self, *data, **kwargs):
+        kwargs.setdefault('weights', None)
+        self.histogram += np.histogramdd(np.array(data).T, bins=self.bin_edges, weights=kwargs['weights'])[0]
 
     @property
     def dimensions(self):

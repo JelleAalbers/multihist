@@ -31,4 +31,4 @@ script:
 
 after_success:
   # Calculate coverage
-  - coveralls --config_file .coveragerc
+  - coveralls
