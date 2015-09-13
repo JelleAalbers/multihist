@@ -1,5 +1,10 @@
 from __future__ import division
 from copy import deepcopy
+try:
+    from itertools import izip as zip
+except ImportError:
+    # Hello, python 3!
+    pass
 
 import numpy as np
 import matplotlib.pyplot as plt
