@@ -277,6 +277,21 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
+    def cumulate(self, axis=0):
+        """Returns new histogram with all data cumulated along axis."""
+        return Histdd.from_histogram(np.cumsum(self.histogram, axis=self.get_axis_number(axis)),
+                                     bin_edges=self.bin_edges,
+                                     axis_names=self.axis_names)
+
+    def cumulative_density(self, axis=0):
+        """Returns new histogram with all values replaced by their cumulative densities along axis."""
+        axis = self.get_axis_number(axis)
+        sum_axis = np.sum(self.histogram, axis=axis)
+        cum_hist = self.cumulate(axis)
+        cum_hist.histogram /= sum_axis[[slice(None) if i != axis else np.newaxis
+                                        for i in range(self.dimensions)]]
+        return cum_hist
+
     def sum(self, axis=0):
         """Sums all data along axis, returns d-1 dimensional histogram"""
         axis = self.get_axis_number(axis)

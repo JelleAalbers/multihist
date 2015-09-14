@@ -115,5 +115,25 @@ class TestHistdd(TestCase):
         self.assertEqual(p2.bin_edges.tolist(), p_2.bin_edges.tolist())
 
 
+    def test_cumulate(self):
+        self.m.add([-1, 0, 1], [-10, 0, 10])
+        np.testing.assert_equal(self.m.histogram,
+                                np.array([[1, 0, 0],
+                                          [0, 1, 0],
+                                          [0, 0, 1]]))
+        np.testing.assert_equal(self.m.cumulate(0).histogram,
+                                np.array([[1, 0, 0],
+                                          [1, 1, 0],
+                                          [1, 1, 1]]))
+        np.testing.assert_equal(self.m.cumulate(1).histogram,
+                                np.array([[1, 1, 1],
+                                          [0, 1, 1],
+                                          [0, 0, 1]]))
+        np.testing.assert_equal(self.m.cumulate(1).histogram,
+                                self.m.cumulative_density(1).histogram)
+        self.m.add([-1, 0, 1], [-10, 0, 10])
+        np.testing.assert_equal(self.m.cumulate(1).histogram,
+                                2 * self.m.cumulative_density(1).histogram)
+
 if __name__ == '__main__':
     unittest.main()
