@@ -263,12 +263,16 @@ class Histdd(MultiHistBase):
         projected_hist = np.sum(self.histogram, axis=self.other_axes(axis))
         return Hist1d.from_histogram(projected_hist, bin_edges=self.bin_edges[axis])
 
+    def _all_axis_bin_centers(self, axis=0):
+        """Return ndarray of same shape as histogram containing bin center value along axis at each point"""
+        # Arcane hack that seems to work, at least in 3d... hope
+        return np.meshgrid(*self.bin_centers(), indexing='ij')[axis]
+
     def average(self, axis=0):
         """Return d-1 dimensional histogram of (estimated) mean value of axis"""
         axis = self.get_axis_number(axis)
-        # Arcane hack that seems to work, at least in 3d... hope
-        axis_coordinates = np.meshgrid(*self.bin_centers(), indexing='ij')[axis]
-        avg_hist = np.ma.average(axis_coordinates, weights=self.histogram, axis=axis)
+        avg_hist = np.ma.average(self._all_axis_bin_centers(axis),
+                                 weights=self.histogram, axis=axis)
         if self.dimensions == 2:
             new_hist = Hist1d
         else:
@@ -291,6 +295,31 @@ class Histdd(MultiHistBase):
         cum_hist.histogram /= sum_axis[[slice(None) if i != axis else np.newaxis
                                         for i in range(self.dimensions)]]
         return cum_hist
+
+    def percentile(self, percentile, axis=0):
+        """Returns n-1 dimensional histogram containing percentile of values along axis"""
+        axis = self.get_axis_number(axis)
+
+        # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
+        # First get an array which has a minimum at the percentile-containing bin on each axis
+        ecdf = self.cumulative_density(axis).histogram
+        hist_with_extrema = ecdf - 2 * (ecdf >= percentile / 100)
+
+        # Now find the extremum indices using np.argmin
+        percentile_indices = np.argmin(hist_with_extrema, axis=axis)
+
+        # Finally, convert from extremum indices to bin centers
+        # I'm not exactly sure how the index unraveling magic works...
+        result = self._all_axis_bin_centers(axis=axis)[np.unravel_index(percentile_indices,
+                                                                        ecdf.shape)]
+
+        if self.dimensions == 2:
+            new_hist = Hist1d
+        else:
+            new_hist = Histdd
+        return new_hist.from_histogram(histogram=result,
+                                       bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
+                                       axis_names=self.axis_names_without(axis))
 
     def sum(self, axis=0):
         """Sums all data along axis, returns d-1 dimensional histogram"""
@@ -320,8 +349,9 @@ class Histdd(MultiHistBase):
 
     def plot(self, **kwargs):
         if self.dimensions == 1:
-            Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot()
+            Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
         elif self.dimensions == 2:
+            # TODO: if 'log_scale' in kwargs and not 'norm' in kwargs:
             plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
