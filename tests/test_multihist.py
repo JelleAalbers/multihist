@@ -114,7 +114,6 @@ class TestHistdd(TestCase):
         self.assertEqual(p2.histogram.tolist(), p_2.histogram.tolist())
         self.assertEqual(p2.bin_edges.tolist(), p_2.bin_edges.tolist())
 
-
     def test_cumulate(self):
         self.m.add([-1, 0, 1], [-10, 0, 10])
         np.testing.assert_equal(self.m.histogram,

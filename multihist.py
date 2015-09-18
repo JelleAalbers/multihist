@@ -339,28 +339,31 @@ class Histdd(MultiHistBase):
         (both inclusive). Returns d dimensional histogram."""
         axis = self.get_axis_number(axis)
         bin_edges = self.bin_edges[axis]
-        start_bin = np.digitize([start], bin_edges)[0]
-        stop_bin = np.digitize([stop], bin_edges)[0]
-        if not (1 <= start_bin <= len(bin_edges)-1 and 1 <= stop_bin <= len(bin_edges)-1):
+        start_bin = np.digitize([start], bin_edges)[0] - 1
+        stop_bin = np.digitize([stop], bin_edges)[0] - 1
+        if not (0 <= start_bin <= len(bin_edges) - 1 and 0 <= stop_bin <= len(bin_edges) - 2):
             raise ValueError("Slice start/stop values are not in range of histogram")
         new_bin_edges = self.bin_edges.copy()
-        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin+2]   # TODO: Test off by one here!
+        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
                                      bin_edges=new_bin_edges, axis_names=self.axis_names)
 
-    def plot(self, **kwargs):
-        kwargs.setdefault('cblabel', None)
+    def plot(self, log_scale=False, cblabel='Number of entries', **kwargs):
         if self.dimensions == 1:
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
         elif self.dimensions == 2:
-            if 'log_scale' in kwargs:
+            if log_scale:
                 kwargs.setdefault('norm', matplotlib.colors.LogNorm(vmin=1, vmax=self.histogram.max()))
             plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
-            plt.colorbar(label=kwargs['cblabel'])
+            plt.colorbar(label=cblabel)
+            plt.xlabel(self.axis_names[0])
+            plt.ylabel(self.axis_names[1])
         else:
             raise ValueError("Can only plot 1- or 2-dimensional histograms!")
+
+Histdd.project = Histdd.projection
 
 
 if __name__ == '__main__':
