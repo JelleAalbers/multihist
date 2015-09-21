@@ -86,6 +86,7 @@ class MultiHistBase(object):
     def __invert__(self):
         return self.__class__.from_histogram(~self.histogram, self.bin_edges, self.axis_names)
 
+MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
 
 class Hist1d(MultiHistBase):
     axis_names = None
@@ -164,28 +165,28 @@ class Hist1d(MultiHistBase):
             bc = 1
         return np.sqrt(np.average((self.bin_centers-self.mean)**2, weights=self.histogram)) * bc
 
-    def plot(self, normed=False, scale_errors_by=1.0, scale_histogram_by=1.0, plt=plt, **kwargs):
+    def plot(self, normed=False, scale_errors_by=1.0, scale_histogram_by=1.0, plt=plt, errors=False, **kwargs):
         """Plots the histogram with Poisson (sqrt(n)) error bars
           - scale_errors_by multiplies the error bars by its argument
           - scale_histogram_by multiplies the histogram AND the error bars by its argument
           - plt thing to call .errorbar on (pylab, figure, axes, whatever the matplotlib guys come up with next)
         """
-        kwargs.setdefault('linestyle', 'none')
-        yerr = np.sqrt(self.histogram)
-        if normed:
-            y = self.normed_histogram
-            yerr /= self.n
+
+        if errors:
+            kwargs.setdefault('linestyle', 'none')
+            yerr = np.sqrt(self.histogram)
+            if normed:
+                y = self.normed_histogram
+                yerr /= self.n
+            else:
+                y = self.histogram.astype(np.float)
+            yerr *= scale_errors_by * scale_histogram_by
+            y *= scale_histogram_by
+            plt.errorbar(self.bin_centers, y, yerr,
+                         marker='.', **kwargs)
         else:
-            y = self.histogram.astype(np.float)
-        yerr *= scale_errors_by * scale_histogram_by
-        y *= scale_histogram_by
-        plt.errorbar(
-            self.bin_centers,
-            y,
-            yerr,
-            marker='.',
-            **kwargs
-        )
+            kwargs.setdefault('linestyle', 'steps')
+            plt.plot(self.bin_centers, self.histogram, **kwargs)
 
 
 class Histdd(MultiHistBase):
@@ -264,15 +265,16 @@ class Histdd(MultiHistBase):
         projected_hist = np.sum(self.histogram, axis=self.other_axes(axis))
         return Hist1d.from_histogram(projected_hist, bin_edges=self.bin_edges[axis])
 
-    def _all_axis_bin_centers(self, axis=0):
+    def all_axis_bin_centers(self, axis=0):
         """Return ndarray of same shape as histogram containing bin center value along axis at each point"""
         # Arcane hack that seems to work, at least in 3d... hope
+        axis = self.get_axis_number(axis)
         return np.meshgrid(*self.bin_centers(), indexing='ij')[axis]
 
     def average(self, axis=0):
         """Return d-1 dimensional histogram of (estimated) mean value of axis"""
         axis = self.get_axis_number(axis)
-        avg_hist = np.ma.average(self._all_axis_bin_centers(axis),
+        avg_hist = np.ma.average(self.all_axis_bin_centers(axis),
                                  weights=self.histogram, axis=axis)
         if self.dimensions == 2:
             new_hist = Hist1d
@@ -284,18 +286,32 @@ class Histdd(MultiHistBase):
 
     def cumulate(self, axis=0):
         """Returns new histogram with all data cumulated along axis."""
-        return Histdd.from_histogram(np.cumsum(self.histogram, axis=self.get_axis_number(axis)),
+        axis = self.get_axis_number(axis)
+        return Histdd.from_histogram(np.cumsum(self.histogram, axis=axis),
+                                     bin_edges=self.bin_edges,
+                                     axis_names=self.axis_names)
+
+    def normalize(self, axis=0):
+        """Returns new histogram where all values along axis (in one bin of the other axes) sum to 1"""
+        axis = self.get_axis_number(axis)
+        sum_along_axis = np.sum(self.histogram, axis=axis)
+        # Don't do anything for subspaces without any entries -- this avoids nans everywhere
+        sum_along_axis[sum_along_axis == 0] = 1
+        hist = self.histogram / sum_along_axis[[slice(None) if i != axis else np.newaxis
+                                                for i in range(self.dimensions)]]
+        return Histdd.from_histogram(hist,
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
 
     def cumulative_density(self, axis=0):
         """Returns new histogram with all values replaced by their cumulative densities along axis."""
-        axis = self.get_axis_number(axis)
-        sum_axis = np.sum(self.histogram, axis=axis)
-        cum_hist = self.cumulate(axis)
-        cum_hist.histogram /= sum_axis[[slice(None) if i != axis else np.newaxis
-                                        for i in range(self.dimensions)]]
-        return cum_hist
+        return self.normalize(axis).cumulate(axis)
+
+    def central_likelihood(self, axis=0):
+        """Returns new histogram with all values replaced by their central likelihoods along axis."""
+        result = self.cumulative_density(axis)
+        result.histogram = 1 - 2 * np.abs(result.histogram - 0.5)
+        return result
 
     def percentile(self, percentile, axis=0):
         """Returns n-1 dimensional histogram containing percentile of values along axis"""
@@ -311,8 +327,7 @@ class Histdd(MultiHistBase):
 
         # Finally, convert from extremum indices to bin centers
         # I'm not exactly sure how the index unraveling magic works...
-        result = self._all_axis_bin_centers(axis=axis)[np.unravel_index(percentile_indices,
-                                                                        ecdf.shape)]
+        result = self.all_axis_bin_centers(axis=axis)[np.unravel_index(percentile_indices, ecdf.shape)]
 
         if self.dimensions == 2:
             new_hist = Hist1d
@@ -334,9 +349,20 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def slice(self, start, stop, axis='x'):
+    def rebin_axis(self, reduction_factor, axis=0):
+        """Returns histogram where bins along axis have been reduced by reduction_factor"""
+        raise NotImplementedError
+
+    def select(self, value, axis=0):
+        """Returns d-1 dimensional histogram of subspace where axis has value"""
+        return self.slice(value, axis).projection(axis)
+
+    def slice(self, start, stop=None, axis=0):
         """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
         (both inclusive). Returns d dimensional histogram."""
+        if stop is None:
+            # Make a 1=bin slice
+            stop = start
         axis = self.get_axis_number(axis)
         bin_edges = self.bin_edges[axis]
         start_bin = np.digitize([start], bin_edges)[0] - 1
@@ -353,13 +379,15 @@ class Histdd(MultiHistBase):
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
         elif self.dimensions == 2:
             if log_scale:
-                kwargs.setdefault('norm', matplotlib.colors.LogNorm(vmin=1, vmax=self.histogram.max()))
+                kwargs.setdefault('norm', matplotlib.colors.LogNorm(vmin=self.histogram.min(),
+                                                                    vmax=self.histogram.max()))
             plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
             plt.colorbar(label=cblabel)
-            plt.xlabel(self.axis_names[0])
-            plt.ylabel(self.axis_names[1])
+            if self.axis_names:
+                plt.xlabel(self.axis_names[0])
+                plt.ylabel(self.axis_names[1])
         else:
             raise ValueError("Can only plot 1- or 2-dimensional histograms!")
 
