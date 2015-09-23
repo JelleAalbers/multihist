@@ -374,12 +374,12 @@ class Histdd(MultiHistBase):
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
                                      bin_edges=new_bin_edges, axis_names=self.axis_names)
 
-    def plot(self, log_scale=False, cblabel='Number of entries', **kwargs):
+    def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, **kwargs):
         if self.dimensions == 1:
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
         elif self.dimensions == 2:
             if log_scale:
-                kwargs.setdefault('norm', matplotlib.colors.LogNorm(vmin=self.histogram.min(),
+                kwargs.setdefault('norm', matplotlib.colors.LogNorm(vmin=max(log_scale_vmin, self.histogram.min()),
                                                                     vmax=self.histogram.max()))
             plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
