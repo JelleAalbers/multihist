@@ -3,6 +3,12 @@
 History
 -------
 
+------------------
+0.3.0 (2015-09-28)
+------------------
+* Several new histdd functions: cumulate, normalize, percentile...
+* Python 2 compatibility
+
 
 ------------------
 0.2.1 (2015-08-18)

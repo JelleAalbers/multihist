@@ -9,7 +9,7 @@ requirements = open('requirements.txt').read().splitlines()
 test_requirements = requirements + ['flake8']
 
 setup(name='multihist',
-      version='0.2.1',
+      version='0.3.0',
       description='Convenience wrappers around numpy histograms',
       long_description=readme + '\n\n' + history,
       author='Jelle Aalbers',
