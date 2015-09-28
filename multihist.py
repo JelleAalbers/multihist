@@ -236,10 +236,15 @@ class Histdd(MultiHistBase):
         return len(self.bin_edges)
 
     def get_axis_number(self, axis):
-        if self.axis_names is None:
-            return axis
-        if axis in self.axis_names:
-            return self.axis_names.index(axis)
+        if self.axis_names is not None:
+            if axis in self.axis_names:
+                return self.axis_names.index(axis)
+            if isinstance(axis, str):
+                raise ValueError("Axis name %s not in histogram. Axis names which are: %s" % (axis, self.axis_names))
+        if isinstance(axis, str):
+            raise ValueError("Axis name %s not in histogram: histogram has no named axes." % axis)
+        if axis < 0:
+            return self.dimensions + axis
         return axis
 
     def other_axes(self, axis):
@@ -254,24 +259,24 @@ class Histdd(MultiHistBase):
 
     def bin_centers(self, axis=None):
         """Return bin centers along an axis, or if axis=None, list of bin_centers along each axis"""
-        axis = self.get_axis_number(axis)
         if axis is None:
             return np.array([self.bin_centers(axis=i) for i in range(self.dimensions)])
+        axis = self.get_axis_number(axis)
         return 0.5*(self.bin_edges[axis][1:] + self.bin_edges[axis][:-1])
 
-    def projection(self, axis=0):
+    def projection(self, axis):
         """Sums all data along all other axes, then return Hist1D"""
         axis = self.get_axis_number(axis)
         projected_hist = np.sum(self.histogram, axis=self.other_axes(axis))
         return Hist1d.from_histogram(projected_hist, bin_edges=self.bin_edges[axis])
 
-    def all_axis_bin_centers(self, axis=0):
+    def all_axis_bin_centers(self, axis):
         """Return ndarray of same shape as histogram containing bin center value along axis at each point"""
         # Arcane hack that seems to work, at least in 3d... hope
         axis = self.get_axis_number(axis)
         return np.meshgrid(*self.bin_centers(), indexing='ij')[axis]
 
-    def average(self, axis=0):
+    def average(self, axis):
         """Return d-1 dimensional histogram of (estimated) mean value of axis"""
         axis = self.get_axis_number(axis)
         avg_hist = np.ma.average(self.all_axis_bin_centers(axis),
@@ -284,14 +289,14 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def cumulate(self, axis=0):
+    def cumulate(self, axis):
         """Returns new histogram with all data cumulated along axis."""
         axis = self.get_axis_number(axis)
         return Histdd.from_histogram(np.cumsum(self.histogram, axis=axis),
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
 
-    def normalize(self, axis=0):
+    def normalize(self, axis):
         """Returns new histogram where all values along axis (in one bin of the other axes) sum to 1"""
         axis = self.get_axis_number(axis)
         sum_along_axis = np.sum(self.histogram, axis=axis)
@@ -303,17 +308,17 @@ class Histdd(MultiHistBase):
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
 
-    def cumulative_density(self, axis=0):
+    def cumulative_density(self, axis):
         """Returns new histogram with all values replaced by their cumulative densities along axis."""
         return self.normalize(axis).cumulate(axis)
 
-    def central_likelihood(self, axis=0):
+    def central_likelihood(self, axis):
         """Returns new histogram with all values replaced by their central likelihoods along axis."""
         result = self.cumulative_density(axis)
         result.histogram = 1 - 2 * np.abs(result.histogram - 0.5)
         return result
 
-    def percentile(self, percentile, axis=0):
+    def percentile(self, percentile, axis):
         """Returns n-1 dimensional histogram containing percentile of values along axis"""
         axis = self.get_axis_number(axis)
 
@@ -337,10 +342,9 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def sum(self, axis=0):
+    def sum(self, axis):
         """Sums all data along axis, returns d-1 dimensional histogram"""
         axis = self.get_axis_number(axis)
-        itemgetter(*self.other_axes(axis))(self.bin_edges)
         if self.dimensions == 2:
             new_hist = Hist1d
         else:
@@ -349,11 +353,11 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def rebin_axis(self, reduction_factor, axis=0):
+    def rebin_axis(self, reduction_factor, axis):
         """Returns histogram where bins along axis have been reduced by reduction_factor"""
         raise NotImplementedError
 
-    def select(self, value, axis=0):
+    def select(self, value, axis):
         """Returns d-1 dimensional histogram of subspace where axis has value"""
         return self.slice(value, axis).projection(axis)
 
@@ -373,6 +377,11 @@ class Histdd(MultiHistBase):
         new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
                                      bin_edges=new_bin_edges, axis_names=self.axis_names)
+
+    def slicesum(self, start, stop=None, axis=0):
+        """Slices the histogram along axis, then sums over that slice, returning a d-1 dimensional histogram"""
+        return self.slice(start, stop, axis).sum(axis)
+
 
     def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, **kwargs):
         if self.dimensions == 1:
