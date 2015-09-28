@@ -11,6 +11,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 from operator import itemgetter
 
+
+class CoordinateOutOfRangeException(Exception):
+    pass
+
+
 class MultiHistBase(object):
 
     def similar_blank_hist(self):
@@ -236,16 +241,15 @@ class Histdd(MultiHistBase):
         return len(self.bin_edges)
 
     def get_axis_number(self, axis):
-        if self.axis_names is not None:
+        if isinstance(axis, int):
+            return axis
+        if isinstance(axis, str):
+            if self.axis_names is None:
+                raise ValueError("Axis name %s not in histogram: histogram has no named axes." % axis)
             if axis in self.axis_names:
                 return self.axis_names.index(axis)
-            if isinstance(axis, str):
-                raise ValueError("Axis name %s not in histogram. Axis names which are: %s" % (axis, self.axis_names))
-        if isinstance(axis, str):
-            raise ValueError("Axis name %s not in histogram: histogram has no named axes." % axis)
-        if axis < 0:
-            return self.dimensions + axis
-        return axis
+            raise ValueError("Axis name %s not in histogram. Axis names which are: %s" % (axis, self.axis_names))
+        raise ValueError("Argument to get_axis_number should be string or integer, but you gave %s" % axis)
 
     def other_axes(self, axis):
         axis = self.get_axis_number(axis)
@@ -361,6 +365,23 @@ class Histdd(MultiHistBase):
         """Returns d-1 dimensional histogram of subspace where axis has value"""
         return self.slice(value, axis).projection(axis)
 
+    def get_axis_bin_index(self, value, axis):
+        """Returns index along axis of bin in histogram which contains value"""
+        axis = self.get_axis_number(axis)
+        bin_edges = self.bin_edges[axis]
+        if value == bin_edges[-1]:
+            return len(bin_edges) - 1
+        result = np.searchsorted(bin_edges, [value])[0] - 1
+        if not 0 <= result <= len(bin_edges) - 1:
+            raise CoordinateOutOfRangeException("Value %s is not in range (%s-%s) of axis %s" % (
+                value, bin_edges[0], bin_edges[-1], axis))
+        return result
+
+    def get_bin_indices(self, values):
+        """Returns index tuple in histogram of bin which contains value"""
+        return tuple([self.get_axis_bin_index(values[ax_i], ax_i)
+                      for ax_i in range(self.dimensions)])
+
     def slice(self, start, stop=None, axis=0):
         """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
         (both inclusive). Returns d dimensional histogram."""
@@ -368,11 +389,8 @@ class Histdd(MultiHistBase):
             # Make a 1=bin slice
             stop = start
         axis = self.get_axis_number(axis)
-        bin_edges = self.bin_edges[axis]
-        start_bin = np.digitize([start], bin_edges)[0] - 1
-        stop_bin = np.digitize([stop], bin_edges)[0] - 1
-        if not (0 <= start_bin <= len(bin_edges) - 1 and 0 <= stop_bin <= len(bin_edges) - 2):
-            raise ValueError("Slice start/stop values are not in range of histogram")
+        start_bin = self.get_axis_bin_index(start, axis)
+        stop_bin = self.get_axis_bin_index(stop, axis)
         new_bin_edges = self.bin_edges.copy()
         new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
