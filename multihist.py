@@ -240,6 +240,9 @@ class Histdd(MultiHistBase):
     def dimensions(self):
         return len(self.bin_edges)
 
+    ##
+    # Axis selection
+    ##
     def get_axis_number(self, axis):
         if isinstance(axis, int):
             return axis
@@ -261,6 +264,9 @@ class Histdd(MultiHistBase):
             return None
         return itemgetter(*self.other_axes(axis))(self.axis_names)
 
+    ##
+    # Bin wrangling: centers <-> edges, values <-> indices
+    ##
     def bin_centers(self, axis=None):
         """Return bin centers along an axis, or if axis=None, list of bin_centers along each axis"""
         if axis is None:
@@ -268,11 +274,26 @@ class Histdd(MultiHistBase):
         axis = self.get_axis_number(axis)
         return 0.5*(self.bin_edges[axis][1:] + self.bin_edges[axis][:-1])
 
-    def projection(self, axis):
-        """Sums all data along all other axes, then return Hist1D"""
+    def get_axis_bin_index(self, value, axis):
+        """Returns index along axis of bin in histogram which contains value
+        Inclusive on both endpoints
+        """
         axis = self.get_axis_number(axis)
-        projected_hist = np.sum(self.histogram, axis=self.other_axes(axis))
-        return Hist1d.from_histogram(projected_hist, bin_edges=self.bin_edges[axis])
+        bin_edges = self.bin_edges[axis]
+        # The right bin edge of np.histogram is inclusive:
+        if value == bin_edges[-1]:
+            return len(bin_edges) - 1
+        # For all other bins, it is exclusive.
+        result = np.searchsorted(bin_edges, [value], side='right')[0] - 1
+        if not 0 <= result <= len(bin_edges) - 1:
+            raise CoordinateOutOfRangeException("Value %s is not in range (%s-%s) of axis %s" % (
+                value, bin_edges[0], bin_edges[-1], axis))
+        return result
+
+    def get_bin_indices(self, values):
+        """Returns index tuple in histogram of bin which contains value"""
+        return tuple([self.get_axis_bin_index(values[ax_i], ax_i)
+                      for ax_i in range(self.dimensions)])
 
     def all_axis_bin_centers(self, axis):
         """Return ndarray of same shape as histogram containing bin center value along axis at each point"""
@@ -280,18 +301,51 @@ class Histdd(MultiHistBase):
         axis = self.get_axis_number(axis)
         return np.meshgrid(*self.bin_centers(), indexing='ij')[axis]
 
-    def average(self, axis):
-        """Return d-1 dimensional histogram of (estimated) mean value of axis"""
+    ##
+    # Data reduction: sum, slice, project, ...
+    ##
+    def sum(self, axis):
+        """Sums all data along axis, returns d-1 dimensional histogram"""
         axis = self.get_axis_number(axis)
-        avg_hist = np.ma.average(self.all_axis_bin_centers(axis),
-                                 weights=self.histogram, axis=axis)
         if self.dimensions == 2:
             new_hist = Hist1d
         else:
             new_hist = Histdd
-        return new_hist.from_histogram(histogram=avg_hist,
+        return new_hist.from_histogram(np.sum(self.histogram, axis=axis),
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
+
+    def rebin_axis(self, reduction_factor, axis):
+        """Returns histogram where bins along axis have been reduced by reduction_factor"""
+        raise NotImplementedError
+
+    def slice(self, start, stop=None, axis=0):
+        """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
+        (both inclusive). Returns d dimensional histogram."""
+        if stop is None:
+            # Make a 1=bin slice
+            stop = start
+        axis = self.get_axis_number(axis)
+        start_bin = self.get_axis_bin_index(start, axis)
+        stop_bin = self.get_axis_bin_index(stop, axis)
+        new_bin_edges = self.bin_edges.copy()
+        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
+        return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
+                                     bin_edges=new_bin_edges, axis_names=self.axis_names)
+
+    def slicesum(self, start, stop=None, axis=0):
+        """Slices the histogram along axis, then sums over that slice, returning a d-1 dimensional histogram"""
+        return self.slice(start, stop, axis).sum(axis)
+
+    def projection(self, axis):
+        """Sums all data along all other axes, then return Hist1D"""
+        axis = self.get_axis_number(axis)
+        projected_hist = np.sum(self.histogram, axis=self.other_axes(axis))
+        return Hist1d.from_histogram(projected_hist, bin_edges=self.bin_edges[axis])
+
+    ##
+    # Density methods: cumulate, normalize, ...
+    ##
 
     def cumulate(self, axis):
         """Returns new histogram with all data cumulated along axis."""
@@ -322,8 +376,12 @@ class Histdd(MultiHistBase):
         result.histogram = 1 - 2 * np.abs(result.histogram - 0.5)
         return result
 
+    ##
+    # Mixed methods: both reduce and summarize the data
+    ##
+
     def percentile(self, percentile, axis):
-        """Returns n-1 dimensional histogram containing percentile of values along axis"""
+        """Returns d-1 dimensional histogram containing percentile of values along axis"""
         axis = self.get_axis_number(axis)
 
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
@@ -346,60 +404,20 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def sum(self, axis):
-        """Sums all data along axis, returns d-1 dimensional histogram"""
+    def average(self, axis):
+        """Returns d-1 dimensional histogram of (estimated) mean value of axis
+        NB this is very different from averaging over the axis!!!
+        """
         axis = self.get_axis_number(axis)
+        avg_hist = np.ma.average(self.all_axis_bin_centers(axis),
+                                 weights=self.histogram, axis=axis)
         if self.dimensions == 2:
             new_hist = Hist1d
         else:
             new_hist = Histdd
-        return new_hist.from_histogram(np.sum(self.histogram, axis=axis),
+        return new_hist.from_histogram(histogram=avg_hist,
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
-
-    def rebin_axis(self, reduction_factor, axis):
-        """Returns histogram where bins along axis have been reduced by reduction_factor"""
-        raise NotImplementedError
-
-    def select(self, value, axis):
-        """Returns d-1 dimensional histogram of subspace where axis has value"""
-        return self.slice(value, axis).projection(axis)
-
-    def get_axis_bin_index(self, value, axis):
-        """Returns index along axis of bin in histogram which contains value"""
-        axis = self.get_axis_number(axis)
-        bin_edges = self.bin_edges[axis]
-        if value == bin_edges[-1]:
-            return len(bin_edges) - 1
-        result = np.searchsorted(bin_edges, [value])[0] - 1
-        if not 0 <= result <= len(bin_edges) - 1:
-            raise CoordinateOutOfRangeException("Value %s is not in range (%s-%s) of axis %s" % (
-                value, bin_edges[0], bin_edges[-1], axis))
-        return result
-
-    def get_bin_indices(self, values):
-        """Returns index tuple in histogram of bin which contains value"""
-        return tuple([self.get_axis_bin_index(values[ax_i], ax_i)
-                      for ax_i in range(self.dimensions)])
-
-    def slice(self, start, stop=None, axis=0):
-        """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
-        (both inclusive). Returns d dimensional histogram."""
-        if stop is None:
-            # Make a 1=bin slice
-            stop = start
-        axis = self.get_axis_number(axis)
-        start_bin = self.get_axis_bin_index(start, axis)
-        stop_bin = self.get_axis_bin_index(stop, axis)
-        new_bin_edges = self.bin_edges.copy()
-        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
-        return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
-                                     bin_edges=new_bin_edges, axis_names=self.axis_names)
-
-    def slicesum(self, start, stop=None, axis=0):
-        """Slices the histogram along axis, then sums over that slice, returning a d-1 dimensional histogram"""
-        return self.slice(start, stop, axis).sum(axis)
-
 
     def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, **kwargs):
         if self.dimensions == 1:
