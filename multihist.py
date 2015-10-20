@@ -381,21 +381,30 @@ class Histdd(MultiHistBase):
     # Mixed methods: both reduce and summarize the data
     ##
 
-    def percentile(self, percentile, axis):
-        """Returns d-1 dimensional histogram containing percentile of values along axis"""
+    def percentile(self, percentile, axis, inclusive=True):
+        """Returns d-1 dimensional histogram containing percentile of values along axis
+        if inclusive=True, will report bin center of first bin for which percentile% of data lies in or below the bin
+                    =False, ... data lies strictly below the bin
+        10% percentile is calculated as: value at least 10% data is LOWER than
+        """
         axis = self.get_axis_number(axis)
 
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
         # First get an array which has a minimum at the percentile-containing bin on each axis
         ecdf = self.cumulative_density(axis).histogram
+        if not inclusive:
+            density = self.normalize(axis).histogram
+            ecdf = ecdf - density
         hist_with_extrema = ecdf - 2 * (ecdf >= percentile / 100)
 
         # Now find the extremum indices using np.argmin
         percentile_indices = np.argmin(hist_with_extrema, axis=axis)
 
         # Finally, convert from extremum indices to bin centers
-        # I'm not exactly sure how the index unraveling magic works...
-        result = self.all_axis_bin_centers(axis=axis)[np.unravel_index(percentile_indices, ecdf.shape)]
+        # See first example under 'Advanced indexing' in http://docs.scipy.org/doc/numpy/reference/arrays.indexing.html
+        index = [np.arange(q) for q in self.histogram.shape]
+        index[axis] = percentile_indices
+        result = self.all_axis_bin_centers(axis=axis)[index]
 
         if self.dimensions == 2:
             new_hist = Hist1d
