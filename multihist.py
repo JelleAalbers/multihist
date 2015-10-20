@@ -282,7 +282,8 @@ class Histdd(MultiHistBase):
         bin_edges = self.bin_edges[axis]
         # The right bin edge of np.histogram is inclusive:
         if value == bin_edges[-1]:
-            return len(bin_edges) - 1
+            # Minus two: one for bin edges rather than centers, one for 0-based indexing
+            return len(bin_edges) - 2
         # For all other bins, it is exclusive.
         result = np.searchsorted(bin_edges, [value], side='right')[0] - 1
         if not 0 <= result <= len(bin_edges) - 1:
