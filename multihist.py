@@ -354,6 +354,10 @@ class Histdd(MultiHistBase):
         return Histdd.from_histogram(np.cumsum(self.histogram, axis=axis),
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
+                                     
+    def _simsalabim_slice(self, axis):
+        return [slice(None) if i != axis else np.newaxis
+                            for i in range(self.dimensions)]
 
     def normalize(self, axis):
         """Returns new histogram where all values along axis (in one bin of the other axes) sum to 1"""
@@ -361,8 +365,7 @@ class Histdd(MultiHistBase):
         sum_along_axis = np.sum(self.histogram, axis=axis)
         # Don't do anything for subspaces without any entries -- this avoids nans everywhere
         sum_along_axis[sum_along_axis == 0] = 1
-        hist = self.histogram / sum_along_axis[[slice(None) if i != axis else np.newaxis
-                                                for i in range(self.dimensions)]]
+        hist = self.histogram / sum_along_axis[self._simsalabim_slice(axis)]
         return Histdd.from_histogram(hist,
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
@@ -429,6 +432,28 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
+    def std(self, axis):
+        """Returns d-1 dimensional histogram of (estimated) std value along axis
+        NB this is very different from just std of the histogram values (which describe bin counts)
+        """
+        def weighted_std(values, weights, axis):
+            # Stolen from http://stackoverflow.com/questions/2413522
+            average = np.average(values, weights=weights, axis=axis)
+            average = average[self._simsalabim_slice(axis)]
+            variance = np.average((values-average)**2, weights=weights, axis=axis)
+            return np.sqrt(variance)
+        
+        axis = self.get_axis_number(axis)
+        std_hist = weighted_std(self.all_axis_bin_centers(axis),
+                                weights=self.histogram, axis=axis)
+        if self.dimensions == 2:
+            new_hist = Hist1d
+        else:
+            new_hist = Histdd
+        return new_hist.from_histogram(histogram=std_hist,
+                                       bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
+                                       axis_names=self.axis_names_without(axis))
+
     def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, **kwargs):
         if self.dimensions == 1:
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
@@ -439,7 +464,8 @@ class Histdd(MultiHistBase):
             plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
-            plt.colorbar(label=cblabel)
+            cb = plt.colorbar(label=cblabel)
+            cb.ax.minorticks_on()
             if self.axis_names:
                 plt.xlabel(self.axis_names[0])
                 plt.ylabel(self.axis_names[1])
