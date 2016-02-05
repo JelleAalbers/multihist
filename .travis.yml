@@ -12,8 +12,10 @@ before_install:
   # See  https://gist.githubusercontent.com/dan-blanchard/7045057/raw/8ca5a4abcd0c65ab05217dd92119001f8454c369/.travis.yml
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
-  - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda/bin:$PATH
+  - ./miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
   - conda update --yes conda
 
 install:
