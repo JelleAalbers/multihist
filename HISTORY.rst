@@ -3,12 +3,18 @@
 History
 -------
 
+
+------------------
+0.4.0 (2016-02-05)
+------------------
+* .std function for Histdd
+* Fix off-by-one errors
+
 ------------------
 0.3.0 (2015-09-28)
 ------------------
 * Several new histdd functions: cumulate, normalize, percentile...
 * Python 2 compatibility
-
 
 ------------------
 0.2.1 (2015-08-18)
