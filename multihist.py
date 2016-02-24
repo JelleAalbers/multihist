@@ -144,7 +144,7 @@ class Hist1d(MultiHistBase):
 
     @property
     def cumulative_histogram(self):
-        return np.cumsum(self.normalized_histogram)
+        return np.cumsum(self.histogram)
 
     @property
     def cumulative_density(self):
@@ -190,7 +190,7 @@ class Hist1d(MultiHistBase):
             plt.errorbar(self.bin_centers, y, yerr,
                          marker='.', **kwargs)
         else:
-            kwargs.setdefault('linestyle', 'steps')
+            kwargs.setdefault('linestyle', 'steps-mid')
             plt.plot(self.bin_centers, self.histogram, **kwargs)
 
 
@@ -454,7 +454,7 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, **kwargs):
+    def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, plt=plt, **kwargs):
         if self.dimensions == 1:
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
         elif self.dimensions == 2:
