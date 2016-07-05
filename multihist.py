@@ -151,6 +151,10 @@ class Hist1d(MultiHistBase):
         cs = np.cumsum(self.histogram)
         return cs/cs[-1]
 
+    def get_random(self, *args, **kwargs):
+        """Returns random variates from the histogram. Only bin centers can be returned."""
+        return np.random.choice(self.bin_centers, p=self.normalized_histogram, *args, **kwargs)
+
     def items(self):
         """Iterate over (bin_center, hist_value) from left to right"""
         return zip(self.bin_centers, self.histogram)
@@ -453,6 +457,21 @@ class Histdd(MultiHistBase):
         return new_hist.from_histogram(histogram=std_hist,
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
+
+    ##
+    # Other stuff
+    ##
+    def get_random(self, size=10):
+        """Returns (size, n_dim) array of random variates from the histogram. 
+        Only bin centers can be returned!
+        """
+        bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(), 
+                                                 indexing='ij')).reshape(2, -1).T
+        hist_ravel = self.histogram.ravel()
+        hist_ravel = hist_ravel.astype(np.float) / np.nansum(hist_ravel)
+        return bin_centers_ravel[np.random.choice(len(bin_centers_ravel), 
+                                                  p=hist_ravel, 
+                                                  size=size)]
 
     def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, plt=plt, **kwargs):
         if self.dimensions == 1:
