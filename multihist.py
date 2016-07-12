@@ -473,6 +473,32 @@ class Histdd(MultiHistBase):
                                                   p=hist_ravel, 
                                                   size=size)]
 
+    def lookup(self, *coordinate_arrays):
+        """Lookup values at specific points.
+        coordinate_arrays: numpy arrays of coordinates, one for each dimension
+        e.g. lookup(np.array([0, 2]), np.array([1, 3])) looks up (x=0, y=1) and (x=2, y3).
+
+        Clips if out of range!! TODO: option to throw exception instead.
+        TODO: Needs tests!!
+        TODO: port to Hist1d... or finally join the classes
+        """
+        assert len(coordinate_arrays) == self.dimensions
+        # Convert each coordinate array to an index array
+        index_arrays = [np.clip(np.searchsorted(self.bin_edges[i], coordinate_arrays[i]) - 1,
+                                0,
+                                len(self.bin_edges[i])-2)
+                        for i in range(self.dimensions)]
+        # Use the index arrays to slice the histogram
+        return self.histogram[index_arrays]
+
+        # Check against slow version:
+        # def hist_to_interpolator_slow(mh):
+        #      bin_centers_ravel = np.array(np.meshgrid(*mh.bin_centers(), indexing='ij')).reshape(2, -1).T
+        #      return NearestNDInterpolator(bin_centers_ravel, mh.histogram.ravel())
+        # x = np.random.uniform(0, 400, 100)
+        # y = np.random.uniform(0, 200, 100)
+        # hist_to_interpolator(mh)(x, y) - hist_to_interpolator_slow(mh)(x, y)
+
     def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, plt=plt, **kwargs):
         if self.dimensions == 1:
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
