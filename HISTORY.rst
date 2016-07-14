@@ -5,6 +5,11 @@ History
 
 
 ------------------
+0.4.1 (2016-02-05)
+------------------
+* get_random and lookup for Histdd. Not really tested yet.
+
+------------------
 0.4.0 (2016-02-05)
 ------------------
 * .std function for Histdd
