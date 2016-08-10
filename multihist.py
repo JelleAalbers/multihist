@@ -11,7 +11,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from operator import itemgetter
 
-__version__ = '0.4.1'
+__version__ = '0.4.2'
 
 
 class CoordinateOutOfRangeException(Exception):
