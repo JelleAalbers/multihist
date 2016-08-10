@@ -11,6 +11,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 from operator import itemgetter
 
+__version__ = '0.4.1'
+
 
 class CoordinateOutOfRangeException(Exception):
     pass
