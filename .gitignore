@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# Gedit junk
+*~
+
 # C extensions
 *.so
 

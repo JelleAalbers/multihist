@@ -3,9 +3,13 @@
 History
 -------
 
+------------------
+0.4.2 (2016-08-10)
+------------------
+* Fix small bug for >=3 d histograms
 
 ------------------
-0.4.1 (2016-02-05)
+0.4.1 (2016-17-14)
 ------------------
 * get_random and lookup for Histdd. Not really tested yet.
 
