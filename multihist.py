@@ -466,7 +466,7 @@ class Histdd(MultiHistBase):
         Only bin centers can be returned!
         """
         bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(), 
-                                                 indexing='ij')).reshape(2, -1).T
+                                                 indexing='ij')).reshape(self.dimensions, -1).T
         hist_ravel = self.histogram.ravel()
         hist_ravel = hist_ravel.astype(np.float) / np.nansum(hist_ravel)
         return bin_centers_ravel[np.random.choice(len(bin_centers_ravel), 
