@@ -10,7 +10,7 @@ before_install:
   # This allows us to get pre-build binaries from numpy etc. from binstar
   # This is quicker and more reliable than compiling from source every build
   # See  https://gist.githubusercontent.com/dan-blanchard/7045057/raw/8ca5a4abcd0c65ab05217dd92119001f8454c369/.travis.yml
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - ./miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
