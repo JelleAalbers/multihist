@@ -4,6 +4,11 @@ History
 -------
 
 ------------------
+0.4.3 (2016-10-03)
+------------------
+* Remove matplotlib requirement (still required for plotting features)
+
+------------------
 0.4.2 (2016-08-10)
 ------------------
 * Fix small bug for >=3 d histograms
