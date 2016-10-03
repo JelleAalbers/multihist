@@ -7,8 +7,14 @@ except ImportError:
     pass
 
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
+try:
+    import matplotlib
+    import matplotlib.pyplot as plt
+    CAN_PLOT = True
+except ImportError:
+    plt = None
+    CAN_PLOT = False
+
 from operator import itemgetter
 
 __version__ = '0.4.2'
@@ -182,7 +188,8 @@ class Hist1d(MultiHistBase):
           - scale_histogram_by multiplies the histogram AND the error bars by its argument
           - plt thing to call .errorbar on (pylab, figure, axes, whatever the matplotlib guys come up with next)
         """
-
+        if not CAN_PLOT:
+            raise ValueError("matplotlib did not import, so can't plot your histogram...")
         if errors:
             kwargs.setdefault('linestyle', 'none')
             yerr = np.sqrt(self.histogram)
@@ -502,6 +509,8 @@ class Histdd(MultiHistBase):
         # hist_to_interpolator(mh)(x, y) - hist_to_interpolator_slow(mh)(x, y)
 
     def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, plt=plt, **kwargs):
+        if not CAN_PLOT:
+            raise ValueError("matplotlib did not import, so can't plot your histogram...")
         if self.dimensions == 1:
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
         elif self.dimensions == 2:
@@ -534,13 +543,14 @@ if __name__ == '__main__':
     # Get the data back out:
     print(m.histogram, m.bin_edges)
 
-    # Access derived quantities like bin_centers, normalized_histogram, density, cumulative_density, mean, std
-    plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", linestyle='steps')
-    plt.plot(m.bin_centers, m.density, label="Empirical PDF", linestyle='steps')
-    plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", linestyle='steps')
-    plt.title("Estimated mean %0.2f, estimated std %0.2f" % (m.mean, m.std))
-    plt.legend(loc='best')
-    plt.show()
+    if CAN_PLOT:
+        # Access derived quantities like bin_centers, normalized_histogram, density, cumulative_density, mean, std
+        plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", linestyle='steps')
+        plt.plot(m.bin_centers, m.density, label="Empirical PDF", linestyle='steps')
+        plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", linestyle='steps')
+        plt.title("Estimated mean %0.2f, estimated std %0.2f" % (m.mean, m.std))
+        plt.legend(loc='best')
+        plt.show()
 
     # Slicing and arithmetic behave just like ordinary ndarrays
     print("The fourth bin has %d entries" % m[3])
@@ -548,18 +558,18 @@ if __name__ == '__main__':
     print("Now it has %d entries" % m[3])
 
     # Of course I couldn't resist adding a canned plotting function:
-    m.plot()
-    plt.show()
+    if CAN_PLOT:
+        m.plot()
+        plt.show()
 
-    # Create and show a 2d histogram. Axis names are optional.
-    m2 = Histdd(bins=100, range=[[-5, 3], [-3, 5]], axis_names=['x', 'y'])
-    m2.add(np.random.normal(1, 1, 10**6), np.random.normal(1, 1, 10**6))
-    m2.add(np.random.normal(-2, 1, 10**6), np.random.normal(2, 1, 10**6))
-    m2.plot()
-    plt.show()
+        # Create and show a 2d histogram. Axis names are optional.
+        m2 = Histdd(bins=100, range=[[-5, 3], [-3, 5]], axis_names=['x', 'y'])
+        m2.add(np.random.normal(1, 1, 10**6), np.random.normal(1, 1, 10**6))
+        m2.add(np.random.normal(-2, 1, 10**6), np.random.normal(2, 1, 10**6))
 
-    # x and y projections return Hist1d objects
-    m2.projection('x').plot(label='x projection')
-    m2.projection(1).plot(label='y projection')
-    plt.legend()
-    plt.show()
+        # x and y projections return Hist1d objects
+        m2.projection('x').plot(label='x projection')
+        m2.projection(1).plot(label='y projection')
+
+        plt.legend()
+        plt.show()
