@@ -20,7 +20,7 @@ before_install:
 
 install:
   # Download numpy and matplotlib binaries from binstar
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy matplotlib
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy
   # Setup coverage for converage measurement
   - pip install coverage
   
