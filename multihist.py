@@ -20,7 +20,8 @@ COLUMNAR_DATA_SOURCES = []
 
 try:
     import dask
-    import dask.DataFrame
+    import dask.dataframe
+
     WE_HAVE_DASK = True
     COLUMNAR_DATA_SOURCES.append(dask.dataframe.DataFrame)
 except ImportError:
@@ -156,19 +157,19 @@ class Hist1d(MultiHistBase):
 
     @property
     def bin_centers(self):
-        return 0.5*(self.bin_edges[1:] + self.bin_edges[:-1])
+        return 0.5 * (self.bin_edges[1:] + self.bin_edges[:-1])
 
     @property
     def density(self):
         """Gives emprical PDF, like np.histogram(...., density=True)"""
         h = self.histogram.astype(np.float)
         bindifs = np.array(np.diff(self.bin_edges), float)
-        return h/(bindifs * self.n)
+        return h / (bindifs * self.n)
 
     @property
     def normalized_histogram(self):
         """Gives histogram with sum of entries normalized to 1."""
-        return self.histogram/self.n
+        return self.histogram / self.n
 
     @property
     def cumulative_histogram(self):
@@ -177,7 +178,7 @@ class Hist1d(MultiHistBase):
     @property
     def cumulative_density(self):
         cs = np.cumsum(self.histogram)
-        return cs/cs[-1]
+        return cs / cs[-1]
 
     def get_random(self, *args, **kwargs):
         """Returns random variates from the histogram. Only bin centers can be returned."""
@@ -197,10 +198,10 @@ class Hist1d(MultiHistBase):
         """Estimates std of underlying data, assuming each datapoint was exactly in the center of its bin."""
         if bessel_correction:
             n = self.n
-            bc = n/(n-1)
+            bc = n / (n - 1)
         else:
             bc = 1
-        return np.sqrt(np.average((self.bin_centers-self.mean)**2, weights=self.histogram)) * bc
+        return np.sqrt(np.average((self.bin_centers - self.mean) ** 2, weights=self.histogram)) * bc
 
     def plot(self, normed=False, scale_errors_by=1.0, scale_histogram_by=1.0, plt=plt, errors=False, **kwargs):
         """Plots the histogram with Poisson (sqrt(n)) error bars
@@ -270,34 +271,43 @@ class Histdd(MultiHistBase):
 
     def add(self, *data, **kwargs):
         self.histogram += self._data_to_hist(data, **kwargs)[0]
-        # np.histogramdd(np.array(data).T, bins=self.bin_edges, weights=kwargs['weights'])[0]
 
     def _data_to_hist(self, data, **kwargs):
         """Return bin_edges, histogram array"""
+        if hasattr(self, 'bin_edges'):
+            kwargs.setdefault('bins', self.bin_edges)
 
         if len(data) == 1 and isinstance(data[0], COLUMNAR_DATA_SOURCES):
             data = data[0]
+
             if self.axis_names is None:
                 raise ValueError("When histogramming from a columnar data source, "
                                  "axis_names or dimensions is mandatory")
+            is_dask = False
             if WE_HAVE_DASK:
-                if isinstance(data, dask.dataframe.DataFrame):
-                    partial_hists = []
-                    for partition in data.to_delayed():
-                        ph = dask.delayed(self.similar_blank_hist().add)(partition)
-                        ph = dask.delayed(lambda x: x.histogram)(ph)
-                        ph = dask.array.from_delayed(ph, self.histogram.shape)
-                        partial_hists.append(ph)
-                    partial_hists = dask.array.stack(*partial_hists)
-                    self.histogram += partial_hists.sum(axis=0).compute(kwargs.get('dask_compute_kwargs', {}))
-                    return
-            else:
-                data = np.vstack([data[x].values for x in self.axis_names]).T
+                is_dask = isinstance(data, dask.dataframe.DataFrame)
 
-        # data is now in shape (n_dimensions, n_points)
-        if hasattr(self, 'bin_edges'):
-            kwargs.setdefault('bins', self.bin_edges)
-        return np.histogramdd(np.array(data).T,
+            if is_dask:
+                fake_histogram = Histdd(axis_names=self.axis_names, bins=kwargs['bins'])
+
+                partial_hists = []
+                for partition in data.to_delayed():
+                    ph = dask.delayed(Histdd)(partition, axis_names=self.axis_names, bins=kwargs['bins'])
+                    ph = dask.delayed(lambda x: x.histogram)(ph)
+                    ph = dask.array.from_delayed(ph, fake_histogram.histogram.shape)
+                    partial_hists.append(ph)
+                partial_hists = dask.array.stack(partial_hists, axis=0)
+
+                histogram = partial_hists.sum(axis=0).compute(**(kwargs.get('dask_compute_kwargs', {})))
+
+                bin_edges = fake_histogram.bin_edges
+                return histogram, bin_edges
+
+            else:
+                data = np.vstack([data[x].values for x in self.axis_names])
+
+        data = np.array(data).T
+        return np.histogramdd(data,
                               bins=kwargs.get('bins'),
                               weights=kwargs.get('weights'),
                               range=kwargs.get('range'))
@@ -338,7 +348,7 @@ class Histdd(MultiHistBase):
         if axis is None:
             return np.array([self.bin_centers(axis=i) for i in range(self.dimensions)])
         axis = self.get_axis_number(axis)
-        return 0.5*(self.bin_edges[axis][1:] + self.bin_edges[axis][:-1])
+        return 0.5 * (self.bin_edges[axis][1:] + self.bin_edges[axis][:-1])
 
     def get_axis_bin_index(self, value, axis):
         """Returns index along axis of bin in histogram which contains value
@@ -548,7 +558,7 @@ class Histdd(MultiHistBase):
         # Convert each coordinate array to an index array
         index_arrays = [np.clip(np.searchsorted(self.bin_edges[i], coordinate_arrays[i]) - 1,
                                 0,
-                                len(self.bin_edges[i])-2)
+                                len(self.bin_edges[i]) - 2)
                         for i in range(self.dimensions)]
         # Use the index arrays to slice the histogram
         return self.histogram[index_arrays]
