@@ -99,6 +99,16 @@ class TestHistdd(TestCase):
                                         range=test_range_2d,
                                         bins=test_bins_2d)[0].tolist())
 
+    def test_pandas(self):
+        import pandas as pd
+        m = self.m
+        test_data = pd.DataFrame([{'foo': 0, 'bar': 0}, {'foo': 0, 'bar': 5}])
+        m.add(test_data)
+        self.assertEqual(m.histogram.tolist(),
+                         np.histogram2d([0, 0], [0, 5],
+                                        range=test_range_2d,
+                                        bins=test_bins_2d)[0].tolist())
+
     def test_projection(self):
         m = self.m
         x = [0.1, 0.8, -0.4]

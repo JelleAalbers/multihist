@@ -6,7 +6,7 @@ except ImportError:
 readme = open('README.rst').read()
 history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 requirements = open('requirements.txt').read().splitlines()
-test_requirements = requirements + ['flake8']
+test_requirements = requirements + ['flake8', 'pandas']
 
 setup(name='multihist',
       version='0.4.3',

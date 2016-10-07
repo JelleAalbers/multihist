@@ -7,6 +7,7 @@ except ImportError:
     pass
 
 import numpy as np
+
 try:
     import matplotlib
     import matplotlib.pyplot as plt
@@ -14,6 +15,25 @@ try:
 except ImportError:
     plt = None
     CAN_PLOT = False
+
+COLUMNAR_DATA_SOURCES = []
+
+try:
+    import dask
+    import dask.DataFrame
+    WE_HAVE_DASK = True
+    COLUMNAR_DATA_SOURCES.append(dask.dataframe.DataFrame)
+except ImportError:
+    WE_HAVE_DASK = False
+    pass
+
+try:
+    import pandas as pd
+    COLUMNAR_DATA_SOURCES.append(pd.DataFrame)
+except ImportError:
+    pass
+
+COLUMNAR_DATA_SOURCES = tuple(COLUMNAR_DATA_SOURCES)
 
 from operator import itemgetter
 
@@ -210,6 +230,7 @@ class Hist1d(MultiHistBase):
 class Histdd(MultiHistBase):
     """multidimensional histogram object
     """
+    axis_names = None
 
     @classmethod
     def from_histogram(cls, histogram, bin_edges, axis_names=None):
@@ -226,6 +247,10 @@ class Histdd(MultiHistBase):
     def __init__(self, *data, **kwargs):
         for k, v in {'bins': 10, 'range': None, 'weights': None, 'axis_names': None}.items():
             kwargs.setdefault(k, v)
+
+        # dimensions is a shorthand [(axis_name_1, bins_1), (axis_name_2, bins_2), ...]
+        if 'dimensions' in kwargs:
+            kwargs['axis_names'], kwargs['bins'] = zip(kwargs['dimensions'])
     
         if len(data) == 0:
             if kwargs['range'] is None:
@@ -239,15 +264,43 @@ class Histdd(MultiHistBase):
             else:
                 dimensions = len(kwargs['range'])
             data = np.zeros((0, dimensions)).T
-        self.histogram, self.bin_edges = np.histogramdd(np.array(data).T, 
-                                                        bins=kwargs['bins'], 
-                                                        weights=kwargs['weights'], 
-                                                        range=kwargs['range'])
+
         self.axis_names = kwargs['axis_names']
+        self.histogram, self.bin_edges = self._data_to_hist(data, **kwargs)
 
     def add(self, *data, **kwargs):
-        kwargs.setdefault('weights', None)
-        self.histogram += np.histogramdd(np.array(data).T, bins=self.bin_edges, weights=kwargs['weights'])[0]
+        self.histogram += self._data_to_hist(data, **kwargs)[0]
+        # np.histogramdd(np.array(data).T, bins=self.bin_edges, weights=kwargs['weights'])[0]
+
+    def _data_to_hist(self, data, **kwargs):
+        """Return bin_edges, histogram array"""
+
+        if len(data) == 1 and isinstance(data[0], COLUMNAR_DATA_SOURCES):
+            data = data[0]
+            if self.axis_names is None:
+                raise ValueError("When histogramming from a columnar data source, "
+                                 "axis_names or dimensions is mandatory")
+            if WE_HAVE_DASK:
+                if isinstance(data, dask.dataframe.DataFrame):
+                    partial_hists = []
+                    for partition in data.to_delayed():
+                        ph = dask.delayed(self.similar_blank_hist().add)(partition)
+                        ph = dask.delayed(lambda x: x.histogram)(ph)
+                        ph = dask.array.from_delayed(ph, self.histogram.shape)
+                        partial_hists.append(ph)
+                    partial_hists = dask.array.stack(*partial_hists)
+                    self.histogram += partial_hists.sum(axis=0).compute(kwargs.get('dask_compute_kwargs', {}))
+                    return
+            else:
+                data = np.vstack([data[x].values for x in self.axis_names]).T
+
+        # data is now in shape (n_dimensions, n_points)
+        if hasattr(self, 'bin_edges'):
+            kwargs.setdefault('bins', self.bin_edges)
+        return np.histogramdd(np.array(data).T,
+                              bins=kwargs.get('bins'),
+                              weights=kwargs.get('weights'),
+                              range=kwargs.get('range'))
 
     @property
     def dimensions(self):
