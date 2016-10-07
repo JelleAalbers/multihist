@@ -4,6 +4,12 @@ History
 -------
 
 ------------------
+0.5.0 (2016-10-07)
+------------------
+* pandas.DataFrame and dask.dataframe support
+* dimensions option to Histdd to init axis_names and bin_centers at once
+
+------------------
 0.4.3 (2016-10-03)
 ------------------
 * Remove matplotlib requirement (still required for plotting features)
