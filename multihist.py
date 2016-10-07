@@ -252,7 +252,7 @@ class Histdd(MultiHistBase):
 
         # dimensions is a shorthand [(axis_name_1, bins_1), (axis_name_2, bins_2), ...]
         if 'dimensions' in kwargs:
-            kwargs['axis_names'], kwargs['bins'] = zip(kwargs['dimensions'])
+            kwargs['axis_names'], kwargs['bins'] = zip(*kwargs['dimensions'])
     
         if len(data) == 0:
             if kwargs['range'] is None:
