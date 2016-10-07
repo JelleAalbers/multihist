@@ -21,8 +21,9 @@ COLUMNAR_DATA_SOURCES = []
 try:
     import dask
     import dask.dataframe
-
+    import dask.multiprocessing
     WE_HAVE_DASK = True
+    DEFAULT_DASK_COMPUTE_KWARGS = dict(get=dask.multiprocessing.get)
     COLUMNAR_DATA_SOURCES.append(dask.dataframe.DataFrame)
 except ImportError:
     WE_HAVE_DASK = False
@@ -298,7 +299,10 @@ class Histdd(MultiHistBase):
                     partial_hists.append(ph)
                 partial_hists = dask.array.stack(partial_hists, axis=0)
 
-                histogram = partial_hists.sum(axis=0).compute(**(kwargs.get('dask_compute_kwargs', {})))
+                compute_options = kwargs.get('compute_options', {})
+                for k, v in DEFAULT_DASK_COMPUTE_KWARGS.items():
+                    compute_options.setdefault(k, v)
+                histogram = partial_hists.sum(axis=0).compute(**compute_options)
 
                 bin_edges = fake_histogram.bin_edges
                 return histogram, bin_edges
