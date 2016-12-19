@@ -25,7 +25,7 @@ try:
     WE_HAVE_DASK = True
     DEFAULT_DASK_COMPUTE_KWARGS = dict(get=dask.multiprocessing.get)
     COLUMNAR_DATA_SOURCES.append(dask.dataframe.DataFrame)
-except ImportError:
+except Exception:           # Sometimes dask import succeeds, but throws error when starting up
     WE_HAVE_DASK = False
     pass
 
@@ -39,7 +39,7 @@ COLUMNAR_DATA_SOURCES = tuple(COLUMNAR_DATA_SOURCES)
 
 from operator import itemgetter
 
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 
 
 class CoordinateOutOfRangeException(Exception):
