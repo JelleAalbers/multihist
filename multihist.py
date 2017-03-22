@@ -606,16 +606,24 @@ class Histdd(MultiHistBase):
         # y = np.random.uniform(0, 200, 100)
         # hist_to_interpolator(mh)(x, y) - hist_to_interpolator_slow(mh)(x, y)
 
-    def plot(self, log_scale=False, cblabel='Number of entries', log_scale_vmin=1, plt=plt, **kwargs):
+    def plot(self, log_scale=False, cblabel='Number of entries', colorbar_kwargs=None, log_scale_vmin=1, plt=plt,
+             **kwargs):
+
+        if colorbar_kwargs is None:
+            colorbar_kwargs = dict()
+        colorbar_kwargs['label'] = cblabel
+
         if not CAN_PLOT:
             raise ValueError("matplotlib did not import, so can't plot your histogram...")
+
         if self.dimensions == 1:
             Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
+
         elif self.dimensions == 2:
             if log_scale:
                 kwargs.setdefault('norm', matplotlib.colors.LogNorm(vmin=max(log_scale_vmin, self.histogram.min()),
                                                                     vmax=self.histogram.max()))
-            plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
+            mesh = plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
             cb = plt.colorbar(label=cblabel)
@@ -623,8 +631,11 @@ class Histdd(MultiHistBase):
             if self.axis_names:
                 plt.xlabel(self.axis_names[0])
                 plt.ylabel(self.axis_names[1])
+            return mesh, cb
+
         else:
             raise ValueError("Can only plot 1- or 2-dimensional histograms!")
+
 
 Histdd.project = Histdd.projection
 
