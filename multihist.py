@@ -39,7 +39,7 @@ COLUMNAR_DATA_SOURCES = tuple(COLUMNAR_DATA_SOURCES)
 
 from operator import itemgetter
 
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 
 
 class CoordinateOutOfRangeException(Exception):
@@ -125,6 +125,7 @@ MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
 
 class Hist1d(MultiHistBase):
     axis_names = None
+    dimensions = 1
 
     @classmethod
     def from_histogram(cls, histogram, bin_edges, axis_names=None):
@@ -182,7 +183,9 @@ class Hist1d(MultiHistBase):
         return cs / cs[-1]
 
     def get_random(self, *args, **kwargs):
-        """Returns random variates from the histogram. Only bin centers can be returned."""
+        """Returns random variates from the histogram.
+        TODO: Only bin centers can be returned!
+        """
         return np.random.choice(self.bin_centers, p=self.normalized_histogram, *args, **kwargs)
 
     def items(self):
@@ -227,6 +230,21 @@ class Hist1d(MultiHistBase):
         else:
             kwargs.setdefault('linestyle', 'steps-mid')
             plt.plot(self.bin_centers, self.histogram, **kwargs)
+
+    def lookup(self, coordinates):
+        """Lookup values at coordinates.
+        coordinates: arraylike of coordinates.
+
+        Clips if out of range!! TODO: option to throw exception instead.
+        TODO: Needs tests!!
+        """
+        # Convert coordinates to indices
+        index_array = np.clip(np.searchsorted(self.bin_edges, coordinates) - 1,
+                              0,
+                              len(self.bin_edges) - 2)
+
+        # Use the index array to slice the histogram
+        return self.histogram[index_array]
 
 
 class Histdd(MultiHistBase):
@@ -538,16 +556,29 @@ class Histdd(MultiHistBase):
     # Other stuff
     ##
     def get_random(self, size=10):
-        """Returns (size, n_dim) array of random variates from the histogram. 
-        Only bin centers can be returned!
+        """Returns (size, n_dim) array of random variates from the histogram.
+        Inside the bins, a uniform distribution is assumed
+        TODO: Test!
         """
-        bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(), 
+        # Sample random bin centers
+        bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(),
                                                  indexing='ij')).reshape(self.dimensions, -1).T
         hist_ravel = self.histogram.ravel()
         hist_ravel = hist_ravel.astype(np.float) / np.nansum(hist_ravel)
-        return bin_centers_ravel[np.random.choice(len(bin_centers_ravel), 
-                                                  p=hist_ravel, 
-                                                  size=size)]
+        result = bin_centers_ravel[np.random.choice(len(bin_centers_ravel),
+                                                    p=hist_ravel,
+                                                    size=size)]
+
+        # Randomize the position inside the bin
+        for dim_i in range(self.dimensions):
+            bin_edges = self.bin_edges[dim_i]
+            bin_widths = np.diff(bin_edges)
+
+            # Note the - 1: for the first bin's bin center, searchsorted gives 1, but we want 0 here:
+            index_of_bin = np.searchsorted(bin_edges, result[:, dim_i]) - 1
+            result[:, dim_i] += (np.random.rand(size) - 0.5) * bin_widths[index_of_bin]
+
+        return result
 
     def lookup(self, *coordinate_arrays):
         """Lookup values at specific points.

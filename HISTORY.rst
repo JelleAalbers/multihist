@@ -3,6 +3,13 @@
 History
 -------
 
+
+------------------
+0.5.1 (2017-03-22)
+------------------
+* get_random for Histdd no longer just returns bin centers (Hist1d does stil...)
+* lookup for Hist1d. When will I finally merge the classes...
+
 ------------------
 0.5.0 (2016-10-07)
 ------------------
