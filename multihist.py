@@ -558,12 +558,13 @@ class Histdd(MultiHistBase):
     ##
     # Other stuff
     ##
-    def rebin(self, *factors, order=0):
+    def rebin(self, *factors, order=1):
         """Return a new histogram that is 'rebinned' (zoomed) by factors (tuple of floats) along each dimensions
           factors: tuple with zoom factors along each axis. e.g. 2 = double number of bins, 0.5 = halve them.
+          order: Order for spline interpolation in scipy.ndimage.zoom. Defaults to  linear interpolation (order=1).
 
         The normalization is set to the normalization of the current histogram
-        The normalization doesn't have to be neat.
+        The factors don't have to be integers or fractions: scipy.ndimage.zoom deals with the rebinning arcana.
         """
         if not HAVE_SCIPY:
             raise NotImplementedError("Rebinning requires scipy.ndimage")
