@@ -9,6 +9,13 @@ except ImportError:
 import numpy as np
 
 try:
+    from scipy.ndimage import zoom
+    from scipy.interpolate import interp1d
+    HAVE_SCIPY = True
+except ImportError:
+    HAVE_SCIPY = False
+
+try:
     import matplotlib
     import matplotlib.pyplot as plt
     CAN_PLOT = True
@@ -414,10 +421,6 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def rebin_axis(self, reduction_factor, axis):
-        """Returns histogram where bins along axis have been reduced by reduction_factor"""
-        raise NotImplementedError
-
     def slice(self, start, stop=None, axis=0):
         """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
         (both inclusive). Returns d dimensional histogram."""
@@ -555,6 +558,43 @@ class Histdd(MultiHistBase):
     ##
     # Other stuff
     ##
+    def rebin(self, *factors, order=0):
+        """Return a new histogram that is 'rebinned' (zoomed) by factors (tuple of floats) along each dimensions
+          factors: tuple with zoom factors along each axis. e.g. 2 = double number of bins, 0.5 = halve them.
+
+        The normalization is set to the normalization of the current histogram
+        The normalization doesn't have to be neat.
+        """
+        if not HAVE_SCIPY:
+            raise NotImplementedError("Rebinning requires scipy.ndimage")
+
+        # Construct a new histogram
+        mh = self.similar_blank_histogram()
+
+        if not len(factors) == self.dimensions:
+            raise ValueError("You must pass %d rebin factors to rebin a %d-dimensional histogram" % (
+                self.dimensions, self.dimensions
+            ))
+
+        # Zoom the bin edges.
+        # It's a bit tricky for non-uniform bins:
+        # we first construct a linear interpolator to take
+        # fraction along axis -> axis coordinate according to current binning.
+        # Then we feed it the new desired binning fractions.
+        for i, f in enumerate(factors):
+            x = self.bin_edges[i]
+            mh.bin_edges[i] = np.interp(
+                x=np.linspace(0, 1, (len(x) - 1) * f + 1),
+                xp=np.linspace(0, 1, len(x)),
+                fp=x)
+
+        # Rebin the histogram using ndimage.zoom, then renormalize
+        mh.histogram = zoom(self.histogram, factors, order=order)
+        mh.histogram *= self.histogram.sum() / mh.histogram.sum()
+        # mh.histogram /= np.product(factors)
+
+        return mh
+
     def get_random(self, size=10):
         """Returns (size, n_dim) array of random variates from the histogram.
         Inside the bins, a uniform distribution is assumed
