@@ -242,6 +242,10 @@ class Hist1d(MultiHistBase):
             kwargs.setdefault('linestyle', 'steps-mid')
             plt.plot(self.bin_centers, self.histogram, **kwargs)
 
+    def percentile(self, percentile):
+        """Return bin center nearest to percentile"""
+        return self.bin_centers[np.argmin(np.abs(self.cumulative_density * 100 - percentile))]
+
     def lookup(self, coordinates):
         """Lookup values at coordinates.
         coordinates: arraylike of coordinates.
@@ -637,6 +641,7 @@ class Histdd(MultiHistBase):
         Clips if out of range!! TODO: option to throw exception instead.
         TODO: Needs tests!!
         TODO: port to Hist1d... or finally join the classes
+        TODO: Support for scalar arguments
         """
         assert len(coordinate_arrays) == self.dimensions
         # Convert each coordinate array to an index array
