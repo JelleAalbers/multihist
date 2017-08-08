@@ -655,7 +655,9 @@ class Histdd(MultiHistBase):
         # y = np.random.uniform(0, 200, 100)
         # hist_to_interpolator(mh)(x, y) - hist_to_interpolator_slow(mh)(x, y)
 
-    def plot(self, log_scale=False, cblabel='Number of entries', colorbar_kwargs=None, log_scale_vmin=1, plt=plt,
+    def plot(self, log_scale=False, log_scale_vmin=1,
+             cblabel='Number of entries', colorbar_kwargs=None,
+             plt=plt,
              **kwargs):
 
         if colorbar_kwargs is None:
@@ -666,7 +668,7 @@ class Histdd(MultiHistBase):
             raise ValueError("matplotlib did not import, so can't plot your histogram...")
 
         if self.dimensions == 1:
-            Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
+            return Hist1d.from_histogram(self.histogram, self.bin_edges[0]).plot(**kwargs)
 
         elif self.dimensions == 2:
             if log_scale:
@@ -675,7 +677,7 @@ class Histdd(MultiHistBase):
             mesh = plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
-            cb = plt.colorbar(label=cblabel)
+            cb = plt.colorbar(**colorbar_kwargs)
             cb.ax.minorticks_on()
             if self.axis_names:
                 plt.xlabel(self.axis_names[0])
