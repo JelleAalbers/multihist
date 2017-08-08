@@ -3,6 +3,12 @@
 History
 -------
 
+------------------
+0.5.2 (2017-08-08)
+------------------
+* Fix colorbar arguments to Histdd.plot (#4)
+* percentile for Hist1d
+* rebin method for Hist1d (experimental)
 
 ------------------
 0.5.1 (2017-03-22)
