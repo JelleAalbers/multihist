@@ -1,5 +1,6 @@
 from __future__ import division
 from copy import deepcopy
+from functools import reduce
 try:
     from itertools import izip as zip
 except ImportError:
@@ -167,6 +168,9 @@ class Hist1d(MultiHistBase):
     @property
     def bin_centers(self):
         return 0.5 * (self.bin_edges[1:] + self.bin_edges[:-1])
+
+    def bin_volumes(self):
+        return np.diff(self.bin_edges)
 
     @property
     def density(self):
@@ -558,6 +562,10 @@ class Histdd(MultiHistBase):
     ##
     # Other stuff
     ##
+    def bin_volumes(self):
+         return reduce(np.multiply, np.ix_(*[np.diff(bs) for bs in self.bin_edges]))
+
+
     def rebin(self, *factors, order=1):
         """Return a new histogram that is 'rebinned' (zoomed) by factors (tuple of floats) along each dimensions
           factors: tuple with zoom factors along each axis. e.g. 2 = double number of bins, 0.5 = halve them.
