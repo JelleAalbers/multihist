@@ -47,7 +47,7 @@ COLUMNAR_DATA_SOURCES = tuple(COLUMNAR_DATA_SOURCES)
 
 from operator import itemgetter
 
-__version__ = '0.5.2'
+__version__ = '0.5.3'
 
 
 class CoordinateOutOfRangeException(Exception):
@@ -582,8 +582,9 @@ class Histdd(MultiHistBase):
         """
         if not HAVE_SCIPY:
             raise NotImplementedError("Rebinning requires scipy.ndimage")
-        if any(x != 'order' for x in kwargs.keys()):
+        if any([x != 'order' for x in kwargs.keys()]):
             raise ValueError("Only 'order' keyword argument is accepted. Yeah, this is confusing.. blame python 2.")
+        order = kwargs.get('order', 1)
 
         # Construct a new histogram
         mh = self.similar_blank_histogram()
