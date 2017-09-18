@@ -570,16 +570,20 @@ class Histdd(MultiHistBase):
          return reduce(np.multiply, np.ix_(*[np.diff(bs) for bs in self.bin_edges]))
 
 
-    def rebin(self, *factors, order=1):
+    def rebin(self, *factors, **kwargs):
         """Return a new histogram that is 'rebinned' (zoomed) by factors (tuple of floats) along each dimensions
           factors: tuple with zoom factors along each axis. e.g. 2 = double number of bins, 0.5 = halve them.
           order: Order for spline interpolation in scipy.ndimage.zoom. Defaults to  linear interpolation (order=1).
+
+        The only accepted keyword argument is 'order'!!! (python 2 is not nice)
 
         The normalization is set to the normalization of the current histogram
         The factors don't have to be integers or fractions: scipy.ndimage.zoom deals with the rebinning arcana.
         """
         if not HAVE_SCIPY:
             raise NotImplementedError("Rebinning requires scipy.ndimage")
+        if any(x != 'order' for x in kwargs.keys()):
+            raise ValueError("Only 'order' keyword argument is accepted. Yeah, this is confusing.. blame python 2.")
 
         # Construct a new histogram
         mh = self.similar_blank_histogram()
