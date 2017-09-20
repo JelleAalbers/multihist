@@ -328,7 +328,9 @@ class Histdd(MultiHistBase):
                 for partition in data.to_delayed():
                     ph = dask.delayed(Histdd)(partition, axis_names=self.axis_names, bins=kwargs['bins'])
                     ph = dask.delayed(lambda x: x.histogram)(ph)
-                    ph = dask.array.from_delayed(ph, shape=fake_histogram.histogram.shape, dtype=fake_histogram.dtype)
+                    ph = dask.array.from_delayed(ph,
+                                                 shape=fake_histogram.histogram.shape,
+                                                 dtype=fake_histogram.histogram.dtype)
                     partial_hists.append(ph)
                 partial_hists = dask.array.stack(partial_hists, axis=0)
 
