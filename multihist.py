@@ -239,8 +239,14 @@ class Hist1d(MultiHistBase):
             plt.errorbar(self.bin_centers, y, yerr,
                          marker='.', **kwargs)
         else:
-            kwargs.setdefault('linestyle', 'steps-mid')
-            plt.plot(self.bin_centers, self.histogram, **kwargs)
+            bin_points = np.zeros(2*len(self.histogram))
+            bin_vals = np.zeros(2*len(self.histogram))
+            bin_points[0::2] = self.bin_edges[0:-1]
+            bin_points[1::2] = self.bin_edges[1::]
+            bin_vals[0::2] = self.histogram
+            bin_vals[1::2] = self.histogram
+            kwargs.setdefault('linestyle')
+            plt.plot(bin_points, bin_vals, **kwargs)
 
     def percentile(self, percentile):
         """Return bin center nearest to percentile"""
