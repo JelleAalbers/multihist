@@ -193,11 +193,13 @@ class Hist1d(MultiHistBase):
         cs = np.cumsum(self.histogram)
         return cs / cs[-1]
 
-    def get_random(self, *args, **kwargs):
+    def get_random(self, size=10):
         """Returns random variates from the histogram.
-        TODO: Only bin centers can be returned!
+        Note this assumes the histogram is an 'events per bin', not a pdf.
+        Inside the bins, a uniform distribution is assumed.
         """
-        return np.random.choice(self.bin_centers, p=self.normalized_histogram, *args, **kwargs)
+        bin_i = np.random.choice(np.arange(len(self.bin_centers)), size=size, p=self.normalized_histogram)
+        return self.bin_centers[bin_i] + np.random.uniform(-0.5, 0.5, size=size) * self.bin_volumes()[bin_i]
 
     def items(self):
         """Iterate over (bin_center, hist_value) from left to right"""
@@ -618,7 +620,8 @@ class Histdd(MultiHistBase):
     def get_random(self, size=10):
         """Returns (size, n_dim) array of random variates from the histogram.
         Inside the bins, a uniform distribution is assumed
-        TODO: Test!
+        Note this assumes the histogram is an 'events per bin', not a pdf.
+        TODO: test more.
         """
         # Sample random bin centers
         bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(),
