@@ -495,26 +495,43 @@ class Histdd(MultiHistBase):
         10% percentile is calculated as: value at least 10% data is LOWER than
         """
         axis = self.get_axis_number(axis)
+        
+        # Shape of histogram
+        s = self.histogram.shape
+
+        # Shape of histogram after axis has been collapsed to 1
+        s_collapsed = list(s)
+        s_collapsed[axis] = 1
+
+        # Shape of histogram with axis removed entirely
+        s_removed = np.concatenate([s[:axis], s[axis + 1:]]).astype(np.int)
 
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
-        
-        # First, get an array which has a minimum at the percentile-containing bin on each axis
+        # First, get an array which has a minimum at the percentile-containing bins
+        # The minimum may not be unique: if later bins are empty, they will not be 
         if inclusive:
             ecdf = self.cumulative_density(axis).histogram
         else:
             density = self.normalize(axis).histogram
             ecdf = ecdf - density
-        hist_with_extrema = ecdf - 2 * (ecdf >= percentile / 100)
-
-        # Now find the extremum indices using np.argmin
-        # This will be an (d-1) dimensional array
-        percentile_indices = np.argmin(hist_with_extrema, axis=axis)
-
-        # Finally, convert from extremum indices to bin centers
-        # See first example under 'Advanced indexing' in http://docs.scipy.org/doc/numpy/reference/arrays.indexing.html
-        index = [np.arange(q) for q in self.histogram.shape]
-        index[axis] = percentile_indices
-        result = self.all_axis_bin_centers(axis=axis)[index]
+        ecdf = np.nan_to_num(ecdf)    # Since we're relying on self-equality later
+        x = ecdf - 2 * (ecdf >= percentile / 100)
+                
+        # We now want to get the location of the minimum
+        # To ensure it is unique, add a very very very small monotonously increasing bit to x
+        # Nobody will want 1e-9th percentiles, right? TODO
+        sz = np.ones(len(s), dtype=np.int)
+        sz[axis] = -1
+        x += np.linspace(0, 1e-9, s[axis]).reshape(sz)
+        
+        # 1. Find the minimum along the axis
+        # 2. Reshape to s_collapsed and perform == to get a mask
+        # 3. Apply the mask to the bin centers along axis
+        # 4. Unflatten with reshape
+        result = self.all_axis_bin_centers(axis)[
+            x == np.min(x, axis=axis).reshape(s_collapsed)
+        ]
+        result = result.reshape(s_removed)
 
         if self.dimensions == 2:
             new_hist = Hist1d
