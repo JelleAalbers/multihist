@@ -1,6 +1,6 @@
 from __future__ import division
 from copy import deepcopy
-from functools import reduce
+from functools import reduce, partial
 try:
     from itertools import izip as zip
 except ImportError:
@@ -75,47 +75,15 @@ class MultiHistBase(object):
     def __setitem__(self, key, value):
         self.histogram[key] = value
 
+    # Let unary operators work on wrapped histogram:
+    def min(self):
+        return self.histogram.min()
+    
+    def max(self):
+        return self.histogram.min()
+        
     def __len__(self):
         return len(self.histogram)
-
-    def __add__(self, other):
-        return self.__class__.from_histogram(self.histogram.__add__(other), self.bin_edges, self.axis_names)
-
-    def __sub__(self, other):
-        return self.__class__.from_histogram(self.histogram.__sub__(other), self.bin_edges, self.axis_names)
-
-    def __mul__(self, other):
-        return self.__class__.from_histogram(self.histogram.__mul__(other), self.bin_edges, self.axis_names)
-
-    def __truediv__(self, other):
-        return self.__class__.from_histogram(self.histogram.__truediv__(other), self.bin_edges, self.axis_names)
-
-    def __floordiv__(self, other):
-        return self.__class__.from_histogram(self.histogram.__floordiv__(other), self.bin_edges, self.axis_names)
-
-    def __mod__(self, other):
-        return self.__class__.from_histogram(self.histogram.__mod__(other), self.bin_edges, self.axis_names)
-
-    def __divmod__(self, other):
-        return self.__class__.from_histogram(self.histogram.__divmod__(other), self.bin_edges, self.axis_names)
-
-    def __pow__(self, other):
-        return self.__class__.from_histogram(self.histogram.__pow__(other), self.bin_edges, self.axis_names)
-
-    def __lshift__(self, other):
-        return self.__class__.from_histogram(self.histogram.__lshift__(other), self.bin_edges, self.axis_names)
-
-    def __rshift__(self, other):
-        return self.__class__.from_histogram(self.histogram.__rshift__(other), self.bin_edges, self.axis_names)
-
-    def __and__(self, other):
-        return self.__class__.from_histogram(self.histogram.__and__(other), self.bin_edges, self.axis_names)
-
-    def __xor__(self, other):
-        return self.__class__.from_histogram(self.histogram.__xor__(other), self.bin_edges, self.axis_names)
-
-    def __or__(self, other):
-        return self.__class__.from_histogram(self.histogram.__or__(other), self.bin_edges, self.axis_names)
 
     def __neg__(self):
         return self.__class__.from_histogram(-self.histogram, self.bin_edges, self.axis_names)
@@ -125,11 +93,34 @@ class MultiHistBase(object):
 
     def __abs__(self):
         return self.__class__.from_histogram(abs(self.histogram), self.bin_edges, self.axis_names)
-
+    
     def __invert__(self):
         return self.__class__.from_histogram(~self.histogram, self.bin_edges, self.axis_names)
 
+    # Let binary operators work on wrapped histogram
+    
+    @classmethod
+    def _make_binop(cls, opname):
+        def binop(self, other):
+            return self.__class__.from_histogram(
+                getattr(self.histogram, opname)(other),
+                self.bin_edges,
+                self.axis_names)
+        return binop
+
+for methodname in 'add sub mul div truediv floordiv mod divmod pow lshift rshift and or'.split():
+    dundername = '__%s__' % methodname
+    setattr(MultiHistBase,
+            dundername,
+            MultiHistBase._make_binop(dundername))
+    setattr(MultiHistBase, 
+            '__r%s__' % methodname,
+            getattr(MultiHistBase, dundername))
+
+# Verbose alias
 MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
+
+
 
 class Hist1d(MultiHistBase):
     axis_names = None
@@ -506,14 +497,17 @@ class Histdd(MultiHistBase):
         axis = self.get_axis_number(axis)
 
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
-        # First get an array which has a minimum at the percentile-containing bin on each axis
-        ecdf = self.cumulative_density(axis).histogram
-        if not inclusive:
+        
+        # First, get an array which has a minimum at the percentile-containing bin on each axis
+        if inclusive:
+            ecdf = self.cumulative_density(axis).histogram
+        else:
             density = self.normalize(axis).histogram
             ecdf = ecdf - density
         hist_with_extrema = ecdf - 2 * (ecdf >= percentile / 100)
 
         # Now find the extremum indices using np.argmin
+        # This will be an (d-1) dimensional array
         percentile_indices = np.argmin(hist_with_extrema, axis=axis)
 
         # Finally, convert from extremum indices to bin centers
@@ -671,7 +665,9 @@ class Histdd(MultiHistBase):
         # hist_to_interpolator(mh)(x, y) - hist_to_interpolator_slow(mh)(x, y)
 
     def plot(self, log_scale=False, log_scale_vmin=1,
-             cblabel='Number of entries', colorbar_kwargs=None,
+             colorbar=True,
+             cblabel='Number of entries', 
+             colorbar_kwargs=None,
              plt=plt,
              **kwargs):
 
@@ -692,12 +688,14 @@ class Histdd(MultiHistBase):
             mesh = plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
-            cb = plt.colorbar(**colorbar_kwargs)
-            cb.ax.minorticks_on()
             if self.axis_names:
                 plt.xlabel(self.axis_names[0])
                 plt.ylabel(self.axis_names[1])
-            return mesh, cb
+            if colorbar:
+                cb = plt.colorbar(**colorbar_kwargs)
+                cb.ax.minorticks_on()
+                return mesh, cb
+            return mesh
 
         else:
             raise ValueError("Can only plot 1- or 2-dimensional histograms!")
