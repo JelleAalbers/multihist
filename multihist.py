@@ -80,7 +80,7 @@ class MultiHistBase(object):
         return self.histogram.min()
     
     def max(self):
-        return self.histogram.min()
+        return self.histogram.max()
         
     def __len__(self):
         return len(self.histogram)
