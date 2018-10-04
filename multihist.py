@@ -681,6 +681,19 @@ class Histdd(MultiHistBase):
         # y = np.random.uniform(0, 200, 100)
         # hist_to_interpolator(mh)(x, y) - hist_to_interpolator_slow(mh)(x, y)
 
+    def lookup_hist(self, mh):
+        """Return histogram within binning of Histdd mh, with values looked up in this histogram.
+
+        This is not rebinning: no interpolation /renormalization is performed.
+        It's just a lookup.
+        """
+        result = mh.similar_blank_histogram()
+        points = np.stack([mh.all_axis_bin_centers(i)
+                           for i in range(mh.dimensions)]).reshape(mh.dimensions, -1)
+        values = self.lookup(*points)
+        result.histogram = values.reshape(result.histogram.shape)
+        return result
+
     def plot(self, log_scale=False, log_scale_vmin=1,
              colorbar=True,
              cblabel='Number of entries', 
