@@ -223,7 +223,7 @@ class Hist1d(MultiHistBase):
             kwargs.setdefault('linestyle', 'none')
             yerr = np.sqrt(self.histogram)
             if normed:
-                y = self.normed_histogram
+                y = self.normalized_histogram
                 yerr /= self.n
             else:
                 y = self.histogram.astype(np.float)
@@ -431,8 +431,9 @@ class Histdd(MultiHistBase):
             # Make a 1=bin slice
             stop = start
         axis = self.get_axis_number(axis)
-        start_bin = self.get_axis_bin_index(start, axis)
-        stop_bin = self.get_axis_bin_index(stop, axis)
+        start_bin = max(0, self.get_axis_bin_index(start, axis))
+        stop_bin = min(len(self.bin_centers(axis)) - 1,  # TODO: test off by one!
+                       self.get_axis_bin_index(stop, axis))
         new_bin_edges = self.bin_edges.copy()
         new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
