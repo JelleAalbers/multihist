@@ -610,7 +610,7 @@ class Histdd(MultiHistBase):
         for i, f in enumerate(factors):
             x = self.bin_edges[i]
             mh.bin_edges[i] = np.interp(
-                x=np.linspace(0, 1, (len(x) - 1) * f + 1),
+                x=np.linspace(0, 1, round((len(x) - 1) * f) + 1),
                 xp=np.linspace(0, 1, len(x)),
                 fp=x)
 
@@ -630,7 +630,8 @@ class Histdd(MultiHistBase):
         bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(),
                                                  indexing='ij')).reshape(self.dimensions, -1).T
         hist_ravel = self.histogram.ravel()
-        hist_ravel = hist_ravel.astype(np.float) / np.nansum(hist_ravel)
+        hist_ravel = hist_ravel.astype(np.float) 
+        hist_ravel = hist_ravel/ np.nansum(hist_ravel)
         result = bin_centers_ravel[np.random.choice(len(bin_centers_ravel),
                                                     p=hist_ravel,
                                                     size=size)]
