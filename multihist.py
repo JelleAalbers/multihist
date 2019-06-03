@@ -78,10 +78,10 @@ class MultiHistBase(object):
     # Let unary operators work on wrapped histogram:
     def min(self):
         return self.histogram.min()
-    
+
     def max(self):
         return self.histogram.max()
-        
+
     def __len__(self):
         return len(self.histogram)
 
@@ -93,12 +93,12 @@ class MultiHistBase(object):
 
     def __abs__(self):
         return self.__class__.from_histogram(abs(self.histogram), self.bin_edges, self.axis_names)
-    
+
     def __invert__(self):
         return self.__class__.from_histogram(~self.histogram, self.bin_edges, self.axis_names)
 
     # Let binary operators work on wrapped histogram
-    
+
     @classmethod
     def _make_binop(cls, opname):
         def binop(self, other):
@@ -113,7 +113,7 @@ for methodname in 'add sub mul div truediv floordiv mod divmod pow lshift rshift
     setattr(MultiHistBase,
             dundername,
             MultiHistBase._make_binop(dundername))
-    setattr(MultiHistBase, 
+    setattr(MultiHistBase,
             '__r%s__' % methodname,
             getattr(MultiHistBase, dundername))
 
@@ -252,7 +252,7 @@ class Hist1d(MultiHistBase):
                               len(self.bin_edges) - 2)
 
         # Use the index array to slice the histogram
-        return self.histogram[index_array]
+        return self.histogram[tuple(index_array)]
 
 
 class Histdd(MultiHistBase):
@@ -279,7 +279,7 @@ class Histdd(MultiHistBase):
         # dimensions is a shorthand [(axis_name_1, bins_1), (axis_name_2, bins_2), ...]
         if 'dimensions' in kwargs:
             kwargs['axis_names'], kwargs['bins'] = zip(*kwargs['dimensions'])
-    
+
         if len(data) == 0:
             if kwargs['range'] is None:
                 if kwargs['bins'] is None:
@@ -459,7 +459,7 @@ class Histdd(MultiHistBase):
         return Histdd.from_histogram(np.cumsum(self.histogram, axis=axis),
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
-                                     
+
     def _simsalabim_slice(self, axis):
         return [slice(None) if i != axis else np.newaxis
                             for i in range(self.dimensions)]
@@ -496,7 +496,7 @@ class Histdd(MultiHistBase):
         10% percentile is calculated as: value at least 10% data is LOWER than
         """
         axis = self.get_axis_number(axis)
-        
+
         # Shape of histogram
         s = self.histogram.shape
 
@@ -509,7 +509,7 @@ class Histdd(MultiHistBase):
 
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
         # First, get an array which has a minimum at the percentile-containing bins
-        # The minimum may not be unique: if later bins are empty, they will not be 
+        # The minimum may not be unique: if later bins are empty, they will not be
         if inclusive:
             ecdf = self.cumulative_density(axis).histogram
         else:
@@ -517,14 +517,14 @@ class Histdd(MultiHistBase):
             ecdf = ecdf - density
         ecdf = np.nan_to_num(ecdf)    # Since we're relying on self-equality later
         x = ecdf - 2 * (ecdf >= percentile / 100)
-                
+
         # We now want to get the location of the minimum
         # To ensure it is unique, add a very very very small monotonously increasing bit to x
         # Nobody will want 1e-9th percentiles, right? TODO
         sz = np.ones(len(s), dtype=np.int)
         sz[axis] = -1
         x += np.linspace(0, 1e-9, s[axis]).reshape(sz)
-        
+
         # 1. Find the minimum along the axis
         # 2. Reshape to s_collapsed and perform == to get a mask
         # 3. Apply the mask to the bin centers along axis
@@ -567,7 +567,7 @@ class Histdd(MultiHistBase):
             average = average[self._simsalabim_slice(axis)]
             variance = np.average((values-average)**2, weights=weights, axis=axis)
             return np.sqrt(variance)
-        
+
         axis = self.get_axis_number(axis)
         std_hist = weighted_std(self.all_axis_bin_centers(axis),
                                 weights=self.histogram, axis=axis)
@@ -672,7 +672,7 @@ class Histdd(MultiHistBase):
                                 len(self.bin_edges[i]) - 2)
                         for i in range(self.dimensions)]
         # Use the index arrays to slice the histogram
-        return self.histogram[index_arrays]
+        return self.histogram[tuple(index_arrays)]
 
         # Check against slow version:
         # def hist_to_interpolator_slow(mh):
@@ -697,7 +697,7 @@ class Histdd(MultiHistBase):
 
     def plot(self, log_scale=False, log_scale_vmin=1,
              colorbar=True,
-             cblabel='Number of entries', 
+             cblabel='Number of entries',
              colorbar_kwargs=None,
              plt=plt,
              **kwargs):
