@@ -1,6 +1,6 @@
 from __future__ import division
 from copy import deepcopy
-from functools import reduce, partial
+from functools import reduce
 try:
     from itertools import izip as zip
 except ImportError:
@@ -11,7 +11,6 @@ import numpy as np
 
 try:
     from scipy.ndimage import zoom
-    from scipy.interpolate import interp1d
     HAVE_SCIPY = True
 except ImportError:
     HAVE_SCIPY = False
@@ -470,7 +469,7 @@ class Histdd(MultiHistBase):
         sum_along_axis = np.sum(self.histogram, axis=axis)
         # Don't do anything for subspaces without any entries -- this avoids nans everywhere
         sum_along_axis[sum_along_axis == 0] = 1
-        hist = self.histogram / sum_along_axis[self._simsalabim_slice(axis)]
+        hist = self.histogram / sum_along_axis[tuple(self._simsalabim_slice(axis))]
         return Histdd.from_histogram(hist,
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
