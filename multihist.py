@@ -231,8 +231,14 @@ class Hist1d(MultiHistBase):
             plt.errorbar(self.bin_centers, y, yerr,
                          marker='.', **kwargs)
         else:
-            kwargs.setdefault('linestyle', 'steps-mid')
-            plt.plot(self.bin_centers, self.histogram, **kwargs)
+            # Note steps-pre: plotting vs centers and using
+            # steps-mid is problematic:
+            #  * the steps won't be correct for log scales
+            #  * the final bins will not fully show
+            kwargs.setdefault('linestyle', 'steps-pre')
+            x = self.bin_edges
+            y = self.lookup(x)
+            plt.plot(x, y, **kwargs)
 
     def percentile(self, percentile):
         """Return bin center nearest to percentile"""
@@ -251,7 +257,7 @@ class Hist1d(MultiHistBase):
                               len(self.bin_edges) - 2)
 
         # Use the index array to slice the histogram
-        return self.histogram[tuple(index_array)]
+        return self.histogram[index_array]
 
 
 class Histdd(MultiHistBase):
