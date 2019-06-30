@@ -3,6 +3,18 @@
 History
 -------
 
+
+------------------
+0.6.0 (2019-06-30)
+------------------
+* Correct step plotting at edges, other plotting fixes
+* Histogram numpy structured arrays
+* Fix deprecation warnings (#6)
+* `lookup_hist`
+* `.max()` and `.min()` methods
+* percentile support for higher-dimensional histograms
+* Improve Hist1d.get_random (also randomize in bin)
+
 ------------------
 0.5.4 (2017-09-20)
 ------------------
