@@ -298,12 +298,20 @@ class Histdd(MultiHistBase):
     def add(self, *data, **kwargs):
         self.histogram += self._data_to_hist(data, **kwargs)[0]
 
+    @staticmethod
+    def _is_columnar(x):
+        if isinstance(x, COLUMNAR_DATA_SOURCES):
+            return True
+        if isinstance(x, np.ndarray) and x.dtype.fields:
+            return True
+        return False
+
     def _data_to_hist(self, data, **kwargs):
         """Return bin_edges, histogram array"""
         if hasattr(self, 'bin_edges'):
             kwargs.setdefault('bins', self.bin_edges)
 
-        if len(data) == 1 and isinstance(data[0], COLUMNAR_DATA_SOURCES):
+        if len(data) == 1 and self._is_columnar(data[0]):
             data = data[0]
 
             if self.axis_names is None:
@@ -335,7 +343,8 @@ class Histdd(MultiHistBase):
                 return histogram, bin_edges
 
             else:
-                data = np.vstack([data[x].values for x in self.axis_names])
+                data = np.vstack([data[x].values if isinstance(data, pd.DataFrame) else data[x]
+                                  for x in self.axis_names])
 
         data = np.array(data).T
         return np.histogramdd(data,
