@@ -11,7 +11,6 @@ import numpy as np
 
 try:
     from scipy.ndimage import zoom
-    from scipy.interpolate import interp1d
     HAVE_SCIPY = True
 except ImportError:
     HAVE_SCIPY = False
@@ -47,7 +46,7 @@ COLUMNAR_DATA_SOURCES = tuple(COLUMNAR_DATA_SOURCES)
 
 from operator import itemgetter
 
-__version__ = '0.5.4'
+__version__ = '0.6.0'
 
 
 class CoordinateOutOfRangeException(Exception):
@@ -75,47 +74,15 @@ class MultiHistBase(object):
     def __setitem__(self, key, value):
         self.histogram[key] = value
 
+    # Let unary operators work on wrapped histogram:
+    def min(self):
+        return self.histogram.min()
+
+    def max(self):
+        return self.histogram.max()
+
     def __len__(self):
         return len(self.histogram)
-
-    def __add__(self, other):
-        return self.__class__.from_histogram(self.histogram.__add__(other), self.bin_edges, self.axis_names)
-
-    def __sub__(self, other):
-        return self.__class__.from_histogram(self.histogram.__sub__(other), self.bin_edges, self.axis_names)
-
-    def __mul__(self, other):
-        return self.__class__.from_histogram(self.histogram.__mul__(other), self.bin_edges, self.axis_names)
-
-    def __truediv__(self, other):
-        return self.__class__.from_histogram(self.histogram.__truediv__(other), self.bin_edges, self.axis_names)
-
-    def __floordiv__(self, other):
-        return self.__class__.from_histogram(self.histogram.__floordiv__(other), self.bin_edges, self.axis_names)
-
-    def __mod__(self, other):
-        return self.__class__.from_histogram(self.histogram.__mod__(other), self.bin_edges, self.axis_names)
-
-    def __divmod__(self, other):
-        return self.__class__.from_histogram(self.histogram.__divmod__(other), self.bin_edges, self.axis_names)
-
-    def __pow__(self, other):
-        return self.__class__.from_histogram(self.histogram.__pow__(other), self.bin_edges, self.axis_names)
-
-    def __lshift__(self, other):
-        return self.__class__.from_histogram(self.histogram.__lshift__(other), self.bin_edges, self.axis_names)
-
-    def __rshift__(self, other):
-        return self.__class__.from_histogram(self.histogram.__rshift__(other), self.bin_edges, self.axis_names)
-
-    def __and__(self, other):
-        return self.__class__.from_histogram(self.histogram.__and__(other), self.bin_edges, self.axis_names)
-
-    def __xor__(self, other):
-        return self.__class__.from_histogram(self.histogram.__xor__(other), self.bin_edges, self.axis_names)
-
-    def __or__(self, other):
-        return self.__class__.from_histogram(self.histogram.__or__(other), self.bin_edges, self.axis_names)
 
     def __neg__(self):
         return self.__class__.from_histogram(-self.histogram, self.bin_edges, self.axis_names)
@@ -129,7 +96,30 @@ class MultiHistBase(object):
     def __invert__(self):
         return self.__class__.from_histogram(~self.histogram, self.bin_edges, self.axis_names)
 
+    # Let binary operators work on wrapped histogram
+
+    @classmethod
+    def _make_binop(cls, opname):
+        def binop(self, other):
+            return self.__class__.from_histogram(
+                getattr(self.histogram, opname)(other),
+                self.bin_edges,
+                self.axis_names)
+        return binop
+
+for methodname in 'add sub mul div truediv floordiv mod divmod pow lshift rshift and or'.split():
+    dundername = '__%s__' % methodname
+    setattr(MultiHistBase,
+            dundername,
+            MultiHistBase._make_binop(dundername))
+    setattr(MultiHistBase,
+            '__r%s__' % methodname,
+            getattr(MultiHistBase, dundername))
+
+# Verbose alias
 MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
+
+
 
 class Hist1d(MultiHistBase):
     axis_names = None
@@ -193,11 +183,13 @@ class Hist1d(MultiHistBase):
         cs = np.cumsum(self.histogram)
         return cs / cs[-1]
 
-    def get_random(self, *args, **kwargs):
+    def get_random(self, size=10):
         """Returns random variates from the histogram.
-        TODO: Only bin centers can be returned!
+        Note this assumes the histogram is an 'events per bin', not a pdf.
+        Inside the bins, a uniform distribution is assumed.
         """
-        return np.random.choice(self.bin_centers, p=self.normalized_histogram, *args, **kwargs)
+        bin_i = np.random.choice(np.arange(len(self.bin_centers)), size=size, p=self.normalized_histogram)
+        return self.bin_centers[bin_i] + np.random.uniform(-0.5, 0.5, size=size) * self.bin_volumes()[bin_i]
 
     def items(self):
         """Iterate over (bin_center, hist_value) from left to right"""
@@ -230,7 +222,7 @@ class Hist1d(MultiHistBase):
             kwargs.setdefault('linestyle', 'none')
             yerr = np.sqrt(self.histogram)
             if normed:
-                y = self.normed_histogram
+                y = self.normalized_histogram
                 yerr /= self.n
             else:
                 y = self.histogram.astype(np.float)
@@ -239,14 +231,14 @@ class Hist1d(MultiHistBase):
             plt.errorbar(self.bin_centers, y, yerr,
                          marker='.', **kwargs)
         else:
-            bin_points = np.zeros(2*len(self.histogram))
-            bin_vals = np.zeros(2*len(self.histogram))
-            bin_points[0::2] = self.bin_edges[0:-1]
-            bin_points[1::2] = self.bin_edges[1::]
-            bin_vals[0::2] = self.histogram
-            bin_vals[1::2] = self.histogram
-            kwargs.setdefault('linestyle')
-            plt.plot(bin_points, bin_vals, **kwargs)
+            # Note steps-pre: plotting vs centers and using
+            # steps-mid is problematic:
+            #  * the steps won't be correct for log scales
+            #  * the final bins will not fully show
+            kwargs.setdefault('linestyle', 'steps-pre')
+            x = self.bin_edges
+            y = self.lookup(x)
+            plt.plot(x, y, **kwargs)
 
     def percentile(self, percentile):
         """Return bin center nearest to percentile"""
@@ -292,7 +284,7 @@ class Histdd(MultiHistBase):
         # dimensions is a shorthand [(axis_name_1, bins_1), (axis_name_2, bins_2), ...]
         if 'dimensions' in kwargs:
             kwargs['axis_names'], kwargs['bins'] = zip(*kwargs['dimensions'])
-    
+
         if len(data) == 0:
             if kwargs['range'] is None:
                 if kwargs['bins'] is None:
@@ -312,12 +304,20 @@ class Histdd(MultiHistBase):
     def add(self, *data, **kwargs):
         self.histogram += self._data_to_hist(data, **kwargs)[0]
 
+    @staticmethod
+    def _is_columnar(x):
+        if isinstance(x, COLUMNAR_DATA_SOURCES):
+            return True
+        if isinstance(x, np.ndarray) and x.dtype.fields:
+            return True
+        return False
+
     def _data_to_hist(self, data, **kwargs):
         """Return bin_edges, histogram array"""
         if hasattr(self, 'bin_edges'):
             kwargs.setdefault('bins', self.bin_edges)
 
-        if len(data) == 1 and isinstance(data[0], COLUMNAR_DATA_SOURCES):
+        if len(data) == 1 and self._is_columnar(data[0]):
             data = data[0]
 
             if self.axis_names is None:
@@ -349,7 +349,8 @@ class Histdd(MultiHistBase):
                 return histogram, bin_edges
 
             else:
-                data = np.vstack([data[x].values for x in self.axis_names])
+                data = np.vstack([data[x].values if isinstance(data, pd.DataFrame) else data[x]
+                                  for x in self.axis_names])
 
         data = np.array(data).T
         return np.histogramdd(data,
@@ -444,8 +445,9 @@ class Histdd(MultiHistBase):
             # Make a 1=bin slice
             stop = start
         axis = self.get_axis_number(axis)
-        start_bin = self.get_axis_bin_index(start, axis)
-        stop_bin = self.get_axis_bin_index(stop, axis)
+        start_bin = max(0, self.get_axis_bin_index(start, axis))
+        stop_bin = min(len(self.bin_centers(axis)) - 1,  # TODO: test off by one!
+                       self.get_axis_bin_index(stop, axis))
         new_bin_edges = self.bin_edges.copy()
         new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
@@ -471,7 +473,7 @@ class Histdd(MultiHistBase):
         return Histdd.from_histogram(np.cumsum(self.histogram, axis=axis),
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
-                                     
+
     def _simsalabim_slice(self, axis):
         return [slice(None) if i != axis else np.newaxis
                             for i in range(self.dimensions)]
@@ -482,7 +484,7 @@ class Histdd(MultiHistBase):
         sum_along_axis = np.sum(self.histogram, axis=axis)
         # Don't do anything for subspaces without any entries -- this avoids nans everywhere
         sum_along_axis[sum_along_axis == 0] = 1
-        hist = self.histogram / sum_along_axis[self._simsalabim_slice(axis)]
+        hist = self.histogram / sum_along_axis[tuple(self._simsalabim_slice(axis))]
         return Histdd.from_histogram(hist,
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
@@ -509,22 +511,42 @@ class Histdd(MultiHistBase):
         """
         axis = self.get_axis_number(axis)
 
+        # Shape of histogram
+        s = self.histogram.shape
+
+        # Shape of histogram after axis has been collapsed to 1
+        s_collapsed = list(s)
+        s_collapsed[axis] = 1
+
+        # Shape of histogram with axis removed entirely
+        s_removed = np.concatenate([s[:axis], s[axis + 1:]]).astype(np.int)
+
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
-        # First get an array which has a minimum at the percentile-containing bin on each axis
-        ecdf = self.cumulative_density(axis).histogram
-        if not inclusive:
+        # First, get an array which has a minimum at the percentile-containing bins
+        # The minimum may not be unique: if later bins are empty, they will not be
+        if inclusive:
+            ecdf = self.cumulative_density(axis).histogram
+        else:
             density = self.normalize(axis).histogram
             ecdf = ecdf - density
-        hist_with_extrema = ecdf - 2 * (ecdf >= percentile / 100)
+        ecdf = np.nan_to_num(ecdf)    # Since we're relying on self-equality later
+        x = ecdf - 2 * (ecdf >= percentile / 100)
 
-        # Now find the extremum indices using np.argmin
-        percentile_indices = np.argmin(hist_with_extrema, axis=axis)
+        # We now want to get the location of the minimum
+        # To ensure it is unique, add a very very very small monotonously increasing bit to x
+        # Nobody will want 1e-9th percentiles, right? TODO
+        sz = np.ones(len(s), dtype=np.int)
+        sz[axis] = -1
+        x += np.linspace(0, 1e-9, s[axis]).reshape(sz)
 
-        # Finally, convert from extremum indices to bin centers
-        # See first example under 'Advanced indexing' in http://docs.scipy.org/doc/numpy/reference/arrays.indexing.html
-        index = [np.arange(q) for q in self.histogram.shape]
-        index[axis] = percentile_indices
-        result = self.all_axis_bin_centers(axis=axis)[index]
+        # 1. Find the minimum along the axis
+        # 2. Reshape to s_collapsed and perform == to get a mask
+        # 3. Apply the mask to the bin centers along axis
+        # 4. Unflatten with reshape
+        result = self.all_axis_bin_centers(axis)[
+            x == np.min(x, axis=axis).reshape(s_collapsed)
+        ]
+        result = result.reshape(s_removed)
 
         if self.dimensions == 2:
             new_hist = Hist1d
@@ -559,7 +581,7 @@ class Histdd(MultiHistBase):
             average = average[self._simsalabim_slice(axis)]
             variance = np.average((values-average)**2, weights=weights, axis=axis)
             return np.sqrt(variance)
-        
+
         axis = self.get_axis_number(axis)
         std_hist = weighted_std(self.all_axis_bin_centers(axis),
                                 weights=self.histogram, axis=axis)
@@ -624,7 +646,8 @@ class Histdd(MultiHistBase):
     def get_random(self, size=10):
         """Returns (size, n_dim) array of random variates from the histogram.
         Inside the bins, a uniform distribution is assumed
-        TODO: Test!
+        Note this assumes the histogram is an 'events per bin', not a pdf.
+        TODO: test more.
         """
         # Sample random bin centers
         bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(),
@@ -664,7 +687,7 @@ class Histdd(MultiHistBase):
                                 len(self.bin_edges[i]) - 2)
                         for i in range(self.dimensions)]
         # Use the index arrays to slice the histogram
-        return self.histogram[index_arrays]
+        return self.histogram[tuple(index_arrays)]
 
         # Check against slow version:
         # def hist_to_interpolator_slow(mh):
@@ -674,8 +697,23 @@ class Histdd(MultiHistBase):
         # y = np.random.uniform(0, 200, 100)
         # hist_to_interpolator(mh)(x, y) - hist_to_interpolator_slow(mh)(x, y)
 
+    def lookup_hist(self, mh):
+        """Return histogram within binning of Histdd mh, with values looked up in this histogram.
+
+        This is not rebinning: no interpolation /renormalization is performed.
+        It's just a lookup.
+        """
+        result = mh.similar_blank_histogram()
+        points = np.stack([mh.all_axis_bin_centers(i)
+                           for i in range(mh.dimensions)]).reshape(mh.dimensions, -1)
+        values = self.lookup(*points)
+        result.histogram = values.reshape(result.histogram.shape)
+        return result
+
     def plot(self, log_scale=False, log_scale_vmin=1,
-             cblabel='Number of entries', colorbar_kwargs=None,
+             colorbar=True,
+             cblabel='Number of entries',
+             colorbar_kwargs=None,
              plt=plt,
              **kwargs):
 
@@ -696,12 +734,14 @@ class Histdd(MultiHistBase):
             mesh = plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
             plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
             plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
-            cb = plt.colorbar(**colorbar_kwargs)
-            cb.ax.minorticks_on()
             if self.axis_names:
                 plt.xlabel(self.axis_names[0])
                 plt.ylabel(self.axis_names[1])
-            return mesh, cb
+            if colorbar:
+                cb = plt.colorbar(**colorbar_kwargs)
+                cb.ax.minorticks_on()
+                return mesh, cb
+            return mesh
 
         else:
             raise ValueError("Can only plot 1- or 2-dimensional histograms!")

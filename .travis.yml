@@ -1,36 +1,18 @@
 language: python
 python:
-  - 2.7
-  - 3.4
-notifications:
-  email: false
-
-before_install:
-  # Setup Miniconda - a lightweight anaconda
-  # This allows us to get pre-build binaries from numpy etc. from binstar
-  # This is quicker and more reliable than compiling from source every build
-  # See  https://gist.githubusercontent.com/dan-blanchard/7045057/raw/8ca5a4abcd0c65ab05217dd92119001f8454c369/.travis.yml
-  - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  - ./miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update --yes conda
-
+  - '2.7'
+  - '3.6'
+  - '3.7'
 install:
-  # Download numpy and matplotlib binaries from binstar
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION numpy pandas
-  # Setup coverage for converage measurement
-  - pip install coverage
-  
+  - pip install -r requirements.txt
   - python setup.py install
-
-
 script:
-  # Run tests
-  - coverage run --source=multihist setup.py test
-
-after_success:
-  # Calculate coverage
-  - coveralls
+  - python setup.py test
+deploy:
+  provider: pypi
+  skip_existing: true
+  user: jelleaalbers
+  on:
+    tags: true
+  password:
+    secure: gVVgnCxjB/LxD87atqXcblln6jstpj8A9HD5cVX+mNWaOWqbvuN3AU0ERjzxSzJcUF2GDDkYStpS/VCfiWzd9u2hPBlHL+mc3im1PM9UyXkBTSmRP49r6DY/E3KmxBG3ra0p5uhkD/EId0SVuLdS8jHa8wj++9hTD3OySjyffhuU/xar90UG+ece7Ejpxk8dUboJKkNG/PDzftHkzPrfjNJUbREoOsaAGwd0J4hASit1MhxgS2f4kkJv8+PPtqojNXLuYlOfPZNHT7LSg152O1MxWEfRNnM7a5fJHE1l/E2e9tEteuU9r9loCHgwyDvpfyVod4zKJ79fevbd1/UqdsK5c+zKcqLNOmu36jWj9uewrPoHfD8iBkL/q5cZ/UYGhu4CkYa3zpgsRoI5OKV4BQNWIZVBrmZkimKMzq7RF+CCctccZHi+fi7Xcy6AwY2wiU2JDkWpAk0fswqisFbi+qrJ75W9+ikptRZy1E/erNmXalx2BbhZaCgApVD4Iho8aDmhK+2PVHL7AeaCe412wgm4X45b/JdjtREF3kJap1Z/3W4SpRE3DnHWo/3ryNDHWYN4X/AwxhXhz1Nnb3c7ttWFzE6oPkDnFwYXCwdyFgoJrYmuO2WfzV2dADENV8rREKIoQvG/l0dY+Vn0USdW9cds87zhMySQadUXyRPsAio=
