@@ -9,7 +9,7 @@ requirements = open('requirements.txt').read().splitlines()
 test_requirements = requirements + ['pandas']
 
 setup(name='multihist',
-      version='0.6.0',
+      version='0.6.1',
       description='Convenience wrappers around numpy histograms',
       long_description=readme + '\n\n' + history,
       author='Jelle Aalbers',
