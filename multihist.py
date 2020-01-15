@@ -638,7 +638,8 @@ class Histdd(MultiHistBase):
 
         # Rebin the histogram using ndimage.zoom, then renormalize
         mh.histogram = zoom(self.histogram, factors, order=order)
-        mh.histogram *= self.histogram.sum() / mh.histogram.sum()
+        if mh.histogram.sum() != 0:
+            mh.histogram *= self.histogram.sum() / mh.histogram.sum()
         # mh.histogram /= np.product(factors)
 
         return mh
