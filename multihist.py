@@ -212,7 +212,7 @@ class Hist1d(MultiHistBase):
 
     def plot(self,
              normed=False, scale_histogram_by=1.0, scale_errors_by=1.0,
-             errors=False, errorstyle='bar', error_alpha=0.3,
+             errors=False, error_style='bar', error_alpha=0.3,
              plt=plt, set_xlim=False,
              **kwargs):
         """Plot the histogram, with error bars if desired.
@@ -256,7 +256,7 @@ class Hist1d(MultiHistBase):
         ylow = ylow.astype(np.float) * scale_histogram_by * scale_errors_by
         yhigh = yhigh.astype(np.float) * scale_histogram_by * scale_errors_by
 
-        if errors and errorstyle == 'bar':
+        if errors and error_style == 'bar':
             kwargs.setdefault('linestyle', 'none')
             kwargs.setdefault('marker', '.')
             plt.errorbar(self.bin_centers,
@@ -274,7 +274,7 @@ class Hist1d(MultiHistBase):
             ylow = fix(ylow)
             yhigh = fix(yhigh)
 
-            if errors and errorstyle == 'band':
+            if errors and error_style == 'band':
                 plt.plot(x, y, drawstyle='steps-pre', **kwargs)
                 alpha = error_alpha
                 if 'alpha' in kwargs:
