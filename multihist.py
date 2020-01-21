@@ -280,8 +280,8 @@ class Hist1d(MultiHistBase):
                 if 'alpha' in kwargs:
                     alpha *= kwargs['alpha']
                     del kwargs['alpha']
+                kwargs['linewidth'] = 0
                 plt.fill_between(x, ylow, yhigh,
-                                 linewidth=0,
                                  alpha=alpha,
                                  step='pre', **kwargs)
             else:
