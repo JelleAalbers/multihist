@@ -281,6 +281,9 @@ class Hist1d(MultiHistBase):
                     alpha *= kwargs['alpha']
                     del kwargs['alpha']
                 kwargs['linewidth'] = 0
+                if 'label' in kwargs:
+                    # Don't want to double-label!
+                    del kwargs['label']
                 plt.fill_between(x, ylow, yhigh,
                                  alpha=alpha,
                                  step='pre', **kwargs)
