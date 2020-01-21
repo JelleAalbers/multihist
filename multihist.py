@@ -11,6 +11,7 @@ import numpy as np
 
 try:
     from scipy.ndimage import zoom
+    from scipy import stats
     HAVE_SCIPY = True
 except ImportError:
     HAVE_SCIPY = False
@@ -120,7 +121,6 @@ for methodname in 'add sub mul div truediv floordiv mod divmod pow lshift rshift
 MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
 
 
-
 class Hist1d(MultiHistBase):
     axis_names = None
     dimensions = 1
@@ -210,35 +210,85 @@ class Hist1d(MultiHistBase):
             bc = 1
         return np.sqrt(np.average((self.bin_centers - self.mean) ** 2, weights=self.histogram)) * bc
 
-    def plot(self, normed=False, scale_errors_by=1.0, scale_histogram_by=1.0, plt=plt, errors=False, **kwargs):
-        """Plots the histogram with Poisson (sqrt(n)) error bars
-          - scale_errors_by multiplies the error bars by its argument
-          - scale_histogram_by multiplies the histogram AND the error bars by its argument
-          - plt thing to call .errorbar on (pylab, figure, axes, whatever the matplotlib guys come up with next)
+    def plot(self,
+             normed=False, scale_histogram_by=1.0, scale_errors_by=1.0,
+             errors=False, errorstyle='bar', error_alpha=0.3,
+             plt=plt, set_xlim=False,
+             **kwargs):
+        """Plot the histogram, with error bars if desired.
+
+        :param normed: Scale the histogram so the sum is 1 before plotting.
+        Errors are computed before scaling, then scaled accordingly.
+        :param scale_histogram_by: Custom multiplier to apply to histogram.
+        Errors are computed before scaling, then scaled accordingly.
+        :param scale_errors_by: Custom multiplier to apply to errors.
+        :param errors: Whether and how to plot 1 sigma error bars
+            * False for no errors
+            * True or 'fc' for Feldman-Cousin errors.
+              For > 20 events, central Poisson intervals are used
+            * 'central' for central Poisson confidence intervals
+            * 'sqrtn' for sqrt(n) errors
+        :param errorstyle: How to plot errors (if errors is not False)
+         * 'bar' for error bars
+         * 'band' for shaded bands
+        :param error_alpha: Alpha multiplier for errorstyle='band'
+        :param plt: Object to call plt... on; matplotlib.pyplot by default.
+        :param set_xlim: If True, set xlim to the range of the hist
         """
         if not CAN_PLOT:
-            raise ValueError("matplotlib did not import, so can't plot your histogram...")
-        if errors:
-            kwargs.setdefault('linestyle', 'none')
-            yerr = np.sqrt(self.histogram)
-            if normed:
-                y = self.normalized_histogram
-                yerr /= self.n
-            else:
-                y = self.histogram.astype(np.float)
-            yerr *= scale_errors_by * scale_histogram_by
-            y *= scale_histogram_by
-            plt.errorbar(self.bin_centers, y, yerr,
-                         marker='.', **kwargs)
+            raise ValueError(
+                "matplotlib did not import, so can't plot your histogram...")
+        x = self.bin_edges
+        y = self.histogram
+        if normed:
+            scale_histogram_by /= y.sum()
+        if errors == 'sqrtn':
+            _yerr = y**0.5
+            ylow, yhigh = y - _yerr, y + _yerr
+        elif errors == 'central':
+            ylow, yhigh = poisson_1s_interval(y, fc=False)
+        elif errors:
+            ylow, yhigh = poisson_1s_interval(y, fc=True)
         else:
-            # Note steps-pre: plotting vs centers and using
-            # steps-mid is problematic:
+            ylow, yhigh = y, y
+
+        y = y.astype(np.float) * scale_histogram_by
+        ylow = ylow.astype(np.float) * scale_histogram_by * scale_errors_by
+        yhigh = yhigh.astype(np.float) * scale_histogram_by * scale_errors_by
+
+        if errors and errorstyle == 'bar':
+            kwargs.setdefault('linestyle', 'none')
+            kwargs.setdefault('marker', '.')
+            plt.errorbar(self.bin_centers,
+                         y,
+                         yerr=[y - ylow, yhigh - y],
+                         **kwargs)
+        else:
+            # Note we use steps-pre, not steps-mid.
+            # If we would have plotted values only vs the centers
             #  * the steps won't be correct for log scales
             #  * the final bins will not fully show
-            kwargs.setdefault('linestyle', 'steps-pre')
-            x = self.bin_edges
-            y = self.lookup(x)
-            plt.plot(x, y, **kwargs)
+            def fix(q):
+                return np.concatenate([[q[0]], q])
+            y = fix(y)
+            ylow = fix(ylow)
+            yhigh = fix(yhigh)
+
+            if errors and errorstyle == 'band':
+                plt.plot(x, y, drawstyle='steps-pre', **kwargs)
+                alpha = error_alpha
+                if 'alpha' in kwargs:
+                    alpha *= kwargs['alpha']
+                    del kwargs['alpha']
+                plt.fill_between(x, ylow, yhigh,
+                                 linewidth=0,
+                                 alpha=alpha,
+                                 step='pre', **kwargs)
+            else:
+                plt.plot(x, y, drawstyle='steps-pre', **kwargs)
+
+        if set_xlim:
+            plt.xlim(x[0], x[-1])
 
     def percentile(self, percentile):
         """Return bin center nearest to percentile"""
@@ -270,6 +320,7 @@ class Histdd(MultiHistBase):
         """Make a HistdD from numpy histogram + bin edges
         :param histogram: Initial histogram
         :param bin_edges: x bin edges of histogram, y bin edges, ...
+        :param axis_names: Names of axes
         :return: Histnd instance
         """
         bin_edges = np.array(bin_edges)
@@ -476,7 +527,7 @@ class Histdd(MultiHistBase):
 
     def _simsalabim_slice(self, axis):
         return [slice(None) if i != axis else np.newaxis
-                            for i in range(self.dimensions)]
+                for i in range(self.dimensions)]
 
     def normalize(self, axis):
         """Returns new histogram where all values along axis (in one bin of the other axes) sum to 1"""
@@ -524,11 +575,9 @@ class Histdd(MultiHistBase):
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
         # First, get an array which has a minimum at the percentile-containing bins
         # The minimum may not be unique: if later bins are empty, they will not be
-        if inclusive:
-            ecdf = self.cumulative_density(axis).histogram
-        else:
-            density = self.normalize(axis).histogram
-            ecdf = ecdf - density
+        ecdf = self.cumulative_density(axis).histogram
+        if not inclusive:
+            raise NotImplementedError("Non-inclusive percentiles not yet implemented")
         ecdf = np.nan_to_num(ecdf)    # Since we're relying on self-equality later
         x = ecdf - 2 * (ecdf >= percentile / 100)
 
@@ -597,8 +646,7 @@ class Histdd(MultiHistBase):
     # Other stuff
     ##
     def bin_volumes(self):
-         return reduce(np.multiply, np.ix_(*[np.diff(bs) for bs in self.bin_edges]))
-
+        return reduce(np.multiply, np.ix_(*[np.diff(bs) for bs in self.bin_edges]))
 
     def rebin(self, *factors, **kwargs):
         """Return a new histogram that is 'rebinned' (zoomed) by factors (tuple of floats) along each dimensions
@@ -655,7 +703,7 @@ class Histdd(MultiHistBase):
                                                  indexing='ij')).reshape(self.dimensions, -1).T
         hist_ravel = self.histogram.ravel()
         hist_ravel = hist_ravel.astype(np.float) 
-        hist_ravel = hist_ravel/ np.nansum(hist_ravel)
+        hist_ravel = hist_ravel / np.nansum(hist_ravel)
         result = bin_centers_ravel[np.random.choice(len(bin_centers_ravel),
                                                     p=hist_ravel,
                                                     size=size)]
@@ -793,3 +841,64 @@ if __name__ == '__main__':
 
         plt.legend()
         plt.show()
+
+
+##
+# Error bar helpers
+##
+
+# Zero-background 1 sigma Poisson Feldman-Cousins intervals
+# From table II in https://arxiv.org/pdf/physics/9711021.pdf
+_fc_intervals = np.array([
+    [0.0, 1.29],
+    [0.37, 2.75],
+    [0.74, 4.25],
+    [1.1, 5.3],
+    [2.34, 6.78],
+    [2.75, 7.81],
+    [3.82, 9.28],
+    [4.25, 10.3],
+    [5.3, 11.32],
+    [6.44, 12.79],
+    [6.78, 13.81],
+    [7.81, 14.82],
+    [8.83, 16.29],
+    [9.28, 17.3],
+    [10.3, 18.32],
+    [11.32, 19.32],
+    [12.33, 20.8],
+    [12.79, 21.81],
+    [13.81, 22.82],
+    [14.82, 23.82],
+    [15.83, 25.3]])
+
+
+def poisson_central_interval(k, cl=0.6826894921370859):
+    """Return central Poisson confidence interval
+    :param k: observed events
+    :param cl: confidence level
+    """
+    if not HAVE_SCIPY:
+        raise NotImplementedError("Poisson errors require scipy")
+    # Adapted from https://stackoverflow.com/a/14832525
+    k = np.asarray(k).astype(np.int)
+    alpha = 1 - cl
+    low = stats.chi2.ppf(alpha / 2, 2 * k) / 2
+    high = stats.chi2.ppf(1 - alpha / 2, 2 * k + 2) / 2
+    return np.stack([np.nan_to_num(low), high])
+
+
+def poisson_1s_interval(k, fc=True):
+    """Return (low, high) 1 sigma Poisson confidence intervals
+
+    :param k: Observed events (int or array of ints)
+    :param fc: if True (default), use Feldman-Cousins for k <= 20,
+    and central intervals otherwise.
+    (at k = 20, the difference between these is 1-2%).
+    """
+    k = np.asarray(k).astype(np.int)
+    result = poisson_central_interval(k)
+    if fc:
+        mask = k <= 20
+        result[:, mask] = _fc_intervals[k[mask]].T
+    return result
