@@ -14,7 +14,7 @@ with methods for adding new data to existing histograms, take averages, projecti
 For 1-dimensional histograms you can access cumulative and density information, as well as basic statistics (mean and std).
 For d-dimensional histograms you can name the axes, and refer to them by their names when projecting / summing / averaging.
 
-**NB**: The PyHEP community has produced a very cool library called `boost-histogram <https://github.com/scikit-hep/boost-histogram>`_. This is faster, more fully featured, and much more robust than multihist. It also has a numpy compatibility layer at ``boost_histogram.numpy``. If you are starting a new project, I would recommend looking into boost-histogram rather than multihist.
+**NB**: The Scikit-HEP project (especially Henry Schreiner and Hans Dembinski) created a very cool library called `boost-histogram <https://github.com/scikit-hep/boost-histogram>`_. This is faster, more fully featured, and much more robust than multihist. It also has a numpy compatibility layer at ``boost_histogram.numpy``. If you are starting a new project, I would recommend looking into boost-histogram rather than multihist.
 
 Synopsis::
 
