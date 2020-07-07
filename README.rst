@@ -14,6 +14,8 @@ with methods for adding new data to existing histograms, take averages, projecti
 For 1-dimensional histograms you can access cumulative and density information, as well as basic statistics (mean and std).
 For d-dimensional histograms you can name the axes, and refer to them by their names when projecting / summing / averaging.
 
+**NB**: The PyHEP community has produced a very cool library called `boost-histogram <https://github.com/scikit-hep/boost-histogram>`_. This is faster, more fully featured, and much more robust than multihist. It also has a numpy compatibility layer at ``boost_histogram.numpy``. If you are starting a new project, I would recommend looking into boost-histogram rather than multihist.
+
 Synopsis::
 
     # Create histograms just like from numpy...
@@ -56,16 +58,3 @@ Synopsis::
     m2.projection(1).plot(label='y projection')
     plt.legend()
     plt.show()
-
-
-Alternatives
-------------
-Of course, the easiest alternative is just to use np.histogram without any wrappers.
-
-If you're looking for a more fancy histogram class, and don't mind installing a big framework,
-you might like the particle physics workhorse ROOT (`https://root.cern.ch/root/html/TH1.html`) and one of its python bindings (pyROOT, rootpy).
-
-If you do come from a ROOT background, you might appreciate pyhistogram (`https://github.com/cbourjau/pyhistogram`) instead,
-which has a much more ROOT-like interface.
-
-Another python histogram package oriented towards physics is `http://docs.danse.us/histogram/0.2.1/intro.html`. This has support for physical units in histograms and error propagation, but the interface is further removed from numpy. 
