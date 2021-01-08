@@ -326,7 +326,6 @@ class Histdd(MultiHistBase):
         :param axis_names: Names of axes
         :return: Histnd instance
         """
-        bin_edges = np.array(bin_edges)
         self = cls(bins=bin_edges, axis_names=axis_names)
         self.histogram = histogram
         return self
@@ -446,7 +445,7 @@ class Histdd(MultiHistBase):
     def bin_centers(self, axis=None):
         """Return bin centers along an axis, or if axis=None, list of bin_centers along each axis"""
         if axis is None:
-            return np.array([self.bin_centers(axis=i) for i in range(self.dimensions)])
+            return [self.bin_centers(axis=i) for i in range(self.dimensions)]
         axis = self.get_axis_number(axis)
         return 0.5 * (self.bin_edges[axis][1:] + self.bin_edges[axis][:-1])
 
