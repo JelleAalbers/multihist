@@ -30,9 +30,9 @@ Synopsis::
     print(m.histogram, m.bin_edges)
 
     # Access derived quantities like bin_centers, normalized_histogram, density, cumulative_density, mean, std
-    plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", linestyle='steps')
-    plt.plot(m.bin_centers, m.density, label="Empirical PDF", linestyle='steps')
-    plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", linestyle='steps')
+    plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", drawstyle='steps')
+    plt.plot(m.bin_centers, m.density, label="Empirical PDF", drawstyle='steps')
+    plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", drawstyle='steps')
     plt.title("Estimated mean %0.2f, estimated std %0.2f" % (m.mean, m.std))
     plt.legend(loc='best')
     plt.show()
