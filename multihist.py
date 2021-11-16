@@ -222,6 +222,8 @@ class Hist1d(MultiHistBase):
         :param scale_histogram_by: Custom multiplier to apply to histogram.
         Errors are computed before scaling, then scaled accordingly.
         :param scale_errors_by: Custom multiplier to apply to errors.
+            This scales the differences between the low/high errors and the
+            mean. For low counts / asymmetric errors, this will look strange.
         :param errors: Whether and how to plot 1 sigma error bars
             * False for no errors
             * True or 'fc' for Feldman-Cousin errors.
@@ -260,8 +262,11 @@ class Hist1d(MultiHistBase):
             ylow, yhigh = y, y
 
         y = y.astype(np.float) * scale_histogram_by
-        ylow = ylow.astype(np.float) * scale_histogram_by * scale_errors_by
-        yhigh = yhigh.astype(np.float) * scale_histogram_by * scale_errors_by
+        ylow = ylow.astype(np.float) * scale_histogram_by
+        yhigh = yhigh.astype(np.float) * scale_histogram_by
+
+        ylow = (y - (y - ylow) * scale_errors_by).clip(0, None)
+        yhigh = y + (yhigh - y) * scale_errors_by
 
         if errors and error_style == 'bar':
             kwargs.setdefault('linestyle', 'none')
