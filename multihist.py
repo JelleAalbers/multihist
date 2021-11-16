@@ -228,6 +228,9 @@ class Hist1d(MultiHistBase):
               For > 20 events, central Poisson intervals are used
             * 'central' for central Poisson confidence intervals
             * 'sqrtn' for sqrt(n) errors
+            * 'model_1s' for central Poisson inverval assuming
+               bin content is the Poisson mean (expectation), NOT a 
+               confidence interval
         :param errorstyle: How to plot errors (if errors is not False)
          * 'bar' for error bars
          * 'band' for shaded bands
@@ -247,6 +250,8 @@ class Hist1d(MultiHistBase):
             ylow, yhigh = y - _yerr, y + _yerr
         elif errors == 'central':
             ylow, yhigh = poisson_1s_interval(y, fc=False)
+        elif errors == 'model_1s':
+            ylow, yhigh = stats.poisson(y).ppf(stats.norm.cdf(-1)), stats.poisson(y).ppf(stats.norm.cdf(1))
         elif errors:
             ylow, yhigh = poisson_1s_interval(y, fc=True)
         else:
