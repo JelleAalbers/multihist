@@ -252,6 +252,8 @@ class Hist1d(MultiHistBase):
             ylow, yhigh = poisson_1s_interval(y, fc=False)
         elif errors == 'model_quantiles':
             ylow, yhigh = stats.poisson(y).ppf(stats.norm.cdf(-1)), stats.poisson(y).ppf(stats.norm.cdf(1))
+            # Show some error band <0.2 expected events
+            yhigh = yhigh.clip(y, None)
         elif errors:
             ylow, yhigh = poisson_1s_interval(y, fc=True)
         else:
