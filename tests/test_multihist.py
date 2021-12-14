@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from multihist import Hist1d, Histdd
+from multihist import Hist1d, Histdd, CAN_PLOT
 
 n_bins = 100
 test_range = (-3, 4)
@@ -143,6 +143,22 @@ class TestHistdd(TestCase):
         self.m.add([-1, 0, 1], [-10, 0, 10])
         np.testing.assert_equal(self.m.cumulate(1).histogram,
                                 2 * self.m.cumulative_density(1).histogram)
+
+    @unittest.skipIf(not CAN_PLOT, "cannot test plotting if matplotlib is not installed")
+    def test_lognorm(self):
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import LogNorm
+        # Create and show a 2d histogram. Axis names are optional.
+        m2 = Histdd(bins=10, range=[[-5, 3], [-3, 5]], axis_names=['x', 'y'])
+        m2.add(np.random.normal(1, 1, 10**3), np.random.normal(1, 1, 10**3))
+        m2.add(np.random.normal(-2, 1, 10**3), np.random.normal(2, 1, 10**3))
+        m2.plot(vmin=1, vmax=10, log_scale=True,)
+        plt.clf()
+        m2.plot(norm=LogNorm(vmin=1, vmax=10))  # correct matplotlib3.5 style
+        plt.clf()
+        m2.plot(log_scale=True,)
+        plt.clf()
+
 
 if __name__ == '__main__':
     unittest.main()
