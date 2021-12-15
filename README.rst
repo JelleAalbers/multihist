@@ -1,8 +1,8 @@
 multihist
 ===========
 
-.. image:: https://travis-ci.org/JelleAalbers/multihist.svg?branch=master
-    :target: https://travis-ci.org/JelleAalbers/multihist
+.. image:: https://github.com/JelleAalbers/multihist/actions/workflows/tests.yml/badge.svg
+    :target: https://github.com/JelleAalbers/multihist/actions/workflows/tests.yml
 
 `https://github.com/JelleAalbers/multihist`
 
@@ -14,7 +14,7 @@ with methods for adding new data to existing histograms, take averages, projecti
 For 1-dimensional histograms you can access cumulative and density information, as well as basic statistics (mean and std).
 For d-dimensional histograms you can name the axes, and refer to them by their names when projecting / summing / averaging.
 
-**NB**: The Scikit-HEP project (especially Henry Schreiner and Hans Dembinski) created a very cool library called `boost-histogram <https://github.com/scikit-hep/boost-histogram>`_. This is faster, more fully featured, and much more robust than multihist. It also has a numpy compatibility layer at ``boost_histogram.numpy``. If you are starting a new project, I would recommend looking into boost-histogram rather than multihist.
+**NB**: For a faster and richer histogram package, check out `hist <https://github.com/scikit-hep/hist>`_ from scikit-hep. Alternatively, look at its parent library `boost-histogram <https://github.com/scikit-hep/boost-histogram>`_, which has `numpy-compatible features <https://boost-histogram.readthedocs.io/en/latest/usage/numpy.html>`_. Multihist was created back in 2015, long before those libraries existed.
 
 Synopsis::
 
