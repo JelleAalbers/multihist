@@ -165,7 +165,7 @@ class Hist1d(MultiHistBase):
     @property
     def density(self):
         """Gives emprical PDF, like np.histogram(...., density=True)"""
-        h = self.histogram.astype(np.float)
+        h = self.histogram.astype(float)
         bindifs = np.array(np.diff(self.bin_edges), float)
         return h / (bindifs * self.n)
 
@@ -584,7 +584,7 @@ class Histdd(MultiHistBase):
         s_collapsed[axis] = 1
 
         # Shape of histogram with axis removed entirely
-        s_removed = np.concatenate([s[:axis], s[axis + 1:]]).astype(np.int)
+        s_removed = np.concatenate([s[:axis], s[axis + 1:]]).astype(int)
 
         # Using np.where here is too tricky, as it may not return a value for each "bin-columns"
         # First, get an array which has a minimum at the percentile-containing bins
@@ -598,7 +598,7 @@ class Histdd(MultiHistBase):
         # We now want to get the location of the minimum
         # To ensure it is unique, add a very very very small monotonously increasing bit to x
         # Nobody will want 1e-9th percentiles, right? TODO
-        sz = np.ones(len(s), dtype=np.int)
+        sz = np.ones(len(s), dtype=int)
         sz[axis] = -1
         x += np.linspace(0, 1e-9, s[axis]).reshape(sz)
 
@@ -716,7 +716,7 @@ class Histdd(MultiHistBase):
         bin_centers_ravel = np.array(np.meshgrid(*self.bin_centers(),
                                                  indexing='ij')).reshape(self.dimensions, -1).T
         hist_ravel = self.histogram.ravel()
-        hist_ravel = hist_ravel.astype(np.float) 
+        hist_ravel = hist_ravel.astype(float)
         hist_ravel = hist_ravel / np.nansum(hist_ravel)
         result = bin_centers_ravel[np.random.choice(len(bin_centers_ravel),
                                                     p=hist_ravel,
@@ -898,7 +898,7 @@ def poisson_central_interval(k, cl=0.6826894921370859):
     if not HAVE_SCIPY:
         raise NotImplementedError("Poisson errors require scipy")
     # Adapted from https://stackoverflow.com/a/14832525
-    k = np.asarray(k).astype(np.int)
+    k = np.asarray(k).astype(int)
     alpha = 1 - cl
     low = stats.chi2.ppf(alpha / 2, 2 * k) / 2
     high = stats.chi2.ppf(1 - alpha / 2, 2 * k + 2) / 2
@@ -913,9 +913,13 @@ def poisson_1s_interval(k, fc=True):
     and central intervals otherwise.
     (at k = 20, the difference between these is 1-2%).
     """
-    k = np.asarray(k).astype(np.int)
+    k = np.asarray(k).astype(int)
     result = poisson_central_interval(k)
     if fc:
         mask = k <= 20
         result[:, mask] = _fc_intervals[k[mask]].T
     return result
+
+
+def _repeat_first(q):
+    return np.concatenate([[q[0]], q])
