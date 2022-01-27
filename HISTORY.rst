@@ -4,6 +4,13 @@ History
 -------
 
 ------------------
+0.6.5 (2022-01-26)
+------------------
+* 'model' option for error bars, showing Poisson quantiles (#14)
+* Fix vmin/vmax for matplotlib >3.3, resume CI tests (#15)
+* Hist1d.data_for_plot returns numbers used in error calculation
+
+------------------
 0.6.4 (2021-01-17)
 ------------------
 * Prevent object array creation (#12)
