@@ -8,6 +8,7 @@ except ImportError:
     pass
 
 import numpy as np
+import sys
 
 try:
     from scipy.ndimage import zoom
