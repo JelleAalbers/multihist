@@ -8,7 +8,6 @@ except ImportError:
     pass
 
 import numpy as np
-import sys
 
 try:
     from scipy.ndimage import zoom
@@ -121,7 +120,7 @@ for methodname in 'add sub mul div truediv floordiv mod divmod pow lshift rshift
 # Verbose alias
 MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
 
-
+_plt_o = plt
 class Hist1d(MultiHistBase):
     axis_names = None
     dimensions = 1
@@ -268,7 +267,7 @@ class Hist1d(MultiHistBase):
     def plot(self,
              normed=False, scale_histogram_by=1.0, scale_errors_by=1.0,
              errors=False, error_style='bar', error_alpha=0.3,
-             plt=plt, set_xlim=False,
+             plt=plt, ax=None, set_xlim=False,
              **kwargs):
         """Plot the histogram, with error bars if desired.
 
@@ -293,11 +292,24 @@ class Hist1d(MultiHistBase):
          * 'band' for shaded bands
         :param error_alpha: Alpha multiplier for errorstyle='band'
         :param plt: Object to call plt... on; matplotlib.pyplot by default.
+        :param ax: Object in which plotting will happen; pyplot.gca() by default.
+                   Overrides plt input if given.
         :param set_xlim: If True, set xlim to the range of the hist
         """
         if not CAN_PLOT:
             raise ValueError(
                 "matplotlib did not import, so can't plot your histogram...")
+
+        if isinstance(plt,_plt_o.Axes) and (ax is None):
+            ax = plt
+        if (plt == _plt_o) and (ax is None):
+            ax = _plt_o.gca()
+        if not isinstance(plt,_plt_o.Axes) and (plt != _plt_o):
+            raise TypeError(
+                "Input 'plt' must be left unchanged, or be an instance of pyplot.Axes")
+        if not isinstance(ax,_plt_o.Axes):
+            raise TypeError(
+                "variable 'ax' must be an instance of pyplot.Axes if given")
 
         x, y, ylow, yhigh = self.data_for_plot(
             normed=normed,
@@ -310,29 +322,29 @@ class Hist1d(MultiHistBase):
             # Plot as points with error bars
             kwargs.setdefault('linestyle', 'none')
             kwargs.setdefault('marker', '.')
-            plt.errorbar(x,
-                         y,
-                         yerr=[y - ylow, yhigh - y],
-                         **kwargs)
+            ax.errorbar(x,
+                        y,
+                        yerr=[y - ylow, yhigh - y],
+                        **kwargs)
 
         else:
 
             if errors and error_style == 'band':
-                line = plt.plot(x, y, drawstyle='steps-pre', **kwargs)
+                line = ax.plot(x, y, drawstyle='steps-pre', **kwargs)
                 kwargs['color'] = line[0].get_color()
                 kwargs['alpha'] = error_alpha * kwargs.get('alpha', 1)
                 kwargs['linewidth'] = 0
                 if 'label' in kwargs:
                     # Don't want to double-label!
                     del kwargs['label']
-                plt.fill_between(x, ylow, yhigh,
+                ax.fill_between(x, ylow, yhigh,
                                  step='pre', **kwargs)
 
             else:
-                plt.plot(x, y, drawstyle='steps-pre', **kwargs)
+                ax.plot(x, y, drawstyle='steps-pre', **kwargs)
 
         if set_xlim:
-            plt.xlim(x[0], x[-1])
+            ax.set_xlim(x[0], x[-1])
 
     def percentile(self, percentile):
         """Return bin center nearest to percentile"""
@@ -806,8 +818,19 @@ class Histdd(MultiHistBase):
              colorbar=True,
              cblabel='Number of entries',
              colorbar_kwargs=None,
-             plt=plt,
+             plt=plt, ax=None,
              **kwargs):
+
+        if isinstance(plt,_plt_o.Axes) and (ax is None):
+            ax = plt
+        if (plt == _plt_o) and (ax is None):
+            ax = _plt_o.gca()
+        if not isinstance(plt,_plt_o.Axes) and (plt != _plt_o):
+            raise TypeError(
+                "Input 'plt' must be left unchanged, or be an instance of pyplot.Axes")
+        if not isinstance(ax,_plt_o.Axes):
+            raise TypeError(
+                "variable 'ax' must be an instance of pyplot.Axes if given")
 
         if colorbar_kwargs is None:
             colorbar_kwargs = dict()
@@ -826,14 +849,14 @@ class Histdd(MultiHistBase):
                                       vmin=kwargs.pop('vmin', max(log_scale_vmin, self.histogram.min())),
                                       vmax=kwargs.pop('vmax', self.histogram.max()))
                                   )
-            mesh = plt.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
-            plt.xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
-            plt.ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
+            mesh = ax.pcolormesh(self.bin_edges[0], self.bin_edges[1], self.histogram.T, **kwargs)
+            ax.set_xlim(np.min(self.bin_edges[0]), np.max(self.bin_edges[0]))
+            ax.set_ylim(np.min(self.bin_edges[1]), np.max(self.bin_edges[1]))
             if self.axis_names:
-                plt.xlabel(self.axis_names[0])
-                plt.ylabel(self.axis_names[1])
+                ax.set_xlabel(self.axis_names[0])
+                ax.set_ylabel(self.axis_names[1])
             if colorbar:
-                cb = plt.colorbar(**colorbar_kwargs)
+                cb = _plt_o.colorbar(**colorbar_kwargs)
                 cb.ax.minorticks_on()
                 return mesh, cb
             return mesh
