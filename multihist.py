@@ -867,6 +867,8 @@ class Histdd(MultiHistBase):
 
 Histdd.project = Histdd.projection
 
+def _repeat_first(q):
+    return np.concatenate([[q[0]], q])
 
 if __name__ == '__main__':
     # Create histograms just like from numpy...
@@ -882,9 +884,9 @@ if __name__ == '__main__':
 
     if CAN_PLOT:
         # Access derived quantities like bin_centers, normalized_histogram, density, cumulative_density, mean, std
-        plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", linestyle='steps')
-        plt.plot(m.bin_centers, m.density, label="Empirical PDF", linestyle='steps')
-        plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", linestyle='steps')
+        plt.plot(m.bin_centers, m.normalized_histogram, label="Normalized histogram", drawstyle='steps')
+        plt.plot(m.bin_centers, m.density, label="Empirical PDF", drawstyle='steps')
+        plt.plot(m.bin_centers, m.cumulative_density, label="Empirical CDF", drawstyle='steps')
         plt.title("Estimated mean %0.2f, estimated std %0.2f" % (m.mean, m.std))
         plt.legend(loc='best')
         plt.show()
@@ -973,5 +975,4 @@ def poisson_1s_interval(k, fc=True):
     return result
 
 
-def _repeat_first(q):
-    return np.concatenate([[q[0]], q])
+
