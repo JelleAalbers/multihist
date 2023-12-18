@@ -102,6 +102,8 @@ class MultiHistBase(object):
     @classmethod
     def _make_binop(cls, opname):
         def binop(self, other):
+            if isinstance(other, self.__class__) and self.histogram.shape != other.histogram.shape:
+                raise ValueError(f"The shapes of the two histograms do not match: {self.histogram.shape} vs {other.histogram.shape}")
             return self.__class__.from_histogram(
                 getattr(self.histogram, opname)(other),
                 self.bin_edges,
@@ -366,6 +368,13 @@ class Histdd(MultiHistBase):
         :param axis_names: Names of axes
         :return: Histnd instance
         """
+        if len(histogram.shape) != len(bin_edges):
+            raise ValueError("Histogram and bin_edges must have the same number of dimensions")
+
+        for hist_dim, bin_edges_dim in zip(histogram.shape, bin_edges):
+            if hist_dim != len(bin_edges_dim) - 1:
+                raise ValueError("Incompatible shapes: histogram shape and bin_edges shape mismatch")
+
         self = cls(bins=bin_edges, axis_names=axis_names)
         self.histogram = histogram
         return self
