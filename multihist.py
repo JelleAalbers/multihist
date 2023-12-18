@@ -102,7 +102,7 @@ class MultiHistBase(object):
     @classmethod
     def _make_binop(cls, opname):
         def binop(self, other):
-            if self.histogram.shape != other.histogram.shape:
+            if isinstance(other, self.__class__) and self.histogram.shape != other.histogram.shape:
                 raise ValueError(f"The shapes of the two histograms do not match: {self.histogram.shape} vs {other.histogram.shape}")
             return self.__class__.from_histogram(
                 getattr(self.histogram, opname)(other),
