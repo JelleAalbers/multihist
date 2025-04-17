@@ -210,6 +210,51 @@ class Hist1d(MultiHistBase):
             bc = 1
         return np.sqrt(np.average((self.bin_centers - self.mean) ** 2, weights=self.histogram)) * bc
 
+    def get_axis_bin_index(self, value):
+        """Returns index along axis of bin in histogram which contains value
+        Inclusive on both endpoints
+        """
+        bin_edges = self.bin_edges
+        # The right bin edge of np.histogram is inclusive:
+        if value == bin_edges[-1]:
+            # Minus two: one for bin edges rather than centers, one for 0-based indexing
+            return len(bin_edges) - 2
+        # For all other bins, it is exclusive.
+        result = np.searchsorted(bin_edges, [value], side='right')[0] - 1
+        if not 0 <= result <= len(bin_edges) - 1:
+            raise CoordinateOutOfRangeException("Value %s is not in range (%s-%s)" % (
+                value, bin_edges[0], bin_edges[-1]))
+        return result
+
+    ##
+    # Data reduction: sum, slice, project, ...
+    ##
+    def sum(self):
+        """Sums all data along the only axis"""
+        return Hist1d.from_histogram(
+            np.array([self.histogram.sum()]),
+            bin_edges=np.array([self.bin_edges[0], self.bin_edges[-1]]),
+        )
+
+    def slice(self, start, stop=None, axis=None):
+        """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
+        (both inclusive). Returns d dimensional histogram."""
+        if stop is None:
+            # Make a 1=bin slice
+            stop = start
+        start_bin = max(0, self.get_axis_bin_index(start))
+        stop_bin = min(len(self.bin_centers) - 1,  # TODO: test off by one!
+                       self.get_axis_bin_index(stop))
+        new_bin_edges = self.bin_edges.copy()[start_bin:stop_bin + 2]   # TODO: Test off by one here!
+        return Hist1d.from_histogram(
+            np.take(self.histogram, np.arange(start_bin, stop_bin + 1)),
+            bin_edges=new_bin_edges,
+        )
+
+    def slicesum(self, start, stop=None, axis=None):
+        """Slices the histogram, then sums over that slice, returning a d-1 dimensional histogram"""
+        return self.slice(start, stop).sum()
+
     def data_for_plot(
         self,
         normed=False, scale_histogram_by=1.0, scale_errors_by=1.0,
