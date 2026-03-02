@@ -214,22 +214,27 @@ class Hist1d(MultiHistBase):
         """Returns index along axis of bin in histogram which contains value
         Inclusive on both endpoints
         """
-        bin_edges = self.bin_edges
-        return find_axis_bin_index(value, bin_edges, 0)
+        return _find_axis_bin_index(value, self.bin_edges, 0)
 
     ##
     # Data reduction: sum, slice, project, ...
     ##
     def sum(self):
-        """Sums all data along the only axis"""
+        """Returns a single-bin Hist1d containing the sum of the histogram.
+
+        (For compatibility with Histdd.sum. To get the numerical value, use Hist1d.n.)
+        """
         return Hist1d.from_histogram(
             np.array([self.histogram.sum()]),
             bin_edges=np.array([self.bin_edges[0], self.bin_edges[-1]]),
         )
 
     def slice(self, start, stop=None, axis=None):
-        """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
-        (both inclusive). Returns 1 dimensional histogram."""
+        """Return another Hist1d restricted to bins whose values (not bin numbers)
+        are between start and stop along axis (both inclusive).
+
+        (The axis argument is not used but present for compatibility with Histdd.slice.)
+        """
         if stop is None:
             # Make a 1=bin slice
             stop = start
@@ -243,7 +248,11 @@ class Hist1d(MultiHistBase):
         )
 
     def slicesum(self, start, stop=None, axis=None):
-        """Slices the histogram, then sums over that slice, returning a number"""
+        """Slices the histogram, then returns a single-bin Hist1d.
+
+        (For compatibility with Histdd slicesum. The axis argument is not used.
+        To get a number instead of a single-bin Hist1d, use .slice(...).n)
+        """
         return self.slice(start, stop).sum()
 
     def data_for_plot(
@@ -531,7 +540,7 @@ class Histdd(MultiHistBase):
         """
         axis = self.get_axis_number(axis)
         bin_edges = self.bin_edges[axis]
-        return find_axis_bin_index(value, bin_edges, axis)
+        return _find_axis_bin_index(value, bin_edges, axis)
 
     def get_bin_indices(self, values):
         """Returns index tuple in histogram of bin which contains value"""
@@ -976,7 +985,11 @@ def poisson_1s_interval(k, fc=True):
     return result
 
 
-def find_axis_bin_index(value, bin_edges, axis):
+def _find_axis_bin_index(value, bin_edges, axis):
+    """Returns index in bin_edges that contains value. Inclusive on both endpoints.
+    Raises CoordinateOutOfRangeException if value is out of range.
+    The axis argument is only used for formatting this error message.
+    """
     # The right bin edge of np.histogram is inclusive:
     if value == bin_edges[-1]:
         # Minus two: one for bin edges rather than centers, one for 0-based indexing
