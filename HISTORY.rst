@@ -4,6 +4,11 @@ History
 -------
 
 ------------------
+0.6.6 (2026-03-02)
+------------------
+* Add Hist1d methods for compatibility with Histdd (#18)
+
+------------------
 0.6.5 (2022-01-26)
 ------------------
 * 'model' option for error bars, showing Poisson quantiles (#14)

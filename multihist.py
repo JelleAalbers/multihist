@@ -47,7 +47,7 @@ COLUMNAR_DATA_SOURCES = tuple(COLUMNAR_DATA_SOURCES)
 
 from operator import itemgetter
 
-__version__ = '0.6.5'
+__version__ = '0.6.6'
 
 
 class CoordinateOutOfRangeException(Exception):
