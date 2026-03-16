@@ -567,22 +567,60 @@ class Histdd(MultiHistBase):
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
-    def slice(self, start, stop=None, axis=0):
-        """Restrict histogram to bins whose data values (not bin numbers) along axis are between start and stop
-        (both inclusive). Returns d dimensional histogram."""
-        if stop is None:
-            # Make a 1=bin slice
-            stop = start
-        axis = self.get_axis_number(axis)
-        start_bin = max(0, self.get_axis_bin_index(start, axis))
-        stop_bin = min(len(self.bin_centers(axis)) - 1,  # TODO: test off by one!
-                       self.get_axis_bin_index(stop, axis))
-        new_bin_edges = self.bin_edges.copy()
-        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
-        return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
-                                     bin_edges=new_bin_edges, axis_names=self.axis_names)
+    def _one_slice(self, start, stop, axis):
+        """Return histogram array slice along axis from start to stop"""
+        if not stop > start:
+            raise ValueError("Stop must be larger than start!")
 
-    def slicesum(self, start, stop=None, axis=0):
+        axis = self.get_axis_number(axis)
+        bin_edges = self.bin_edges[axis]
+
+        # First we calculate the intersection of the bin with the start and stop
+        bin_starts = bin_edges[:-1]
+        bin_ends = bin_edges[1:]
+        start_clipped = np.maximum(bin_starts, start)
+        stop_clipped = np.minimum(bin_ends, stop)
+        overlaps = np.maximum(0, stop_clipped - start_clipped)
+        bin_widths = bin_ends - bin_starts
+        bin_fractions = overlaps / bin_widths
+
+        # Now we multiply the histogram by the fraction and sum along the axis
+        shape = [1] * self.histogram.ndim
+        shape[axis] = len(bin_fractions)
+        bin_fractions = bin_fractions.reshape(shape)
+        return (self.histogram * bin_fractions).sum(axis=axis)
+
+    def slice(self, start, stop, axis):
+        """Restrict histogram to bins within start and stop along axis. Returns d dimensional histogram.
+        If the start and stop fractionally overlap a bin, the histogram in that bin is scaled down according 
+        to the overlap fraction."""
+        if not stop > start:
+            raise ValueError("Stop must be larger than start!")
+        axis = self.get_axis_number(axis)
+        new_bin_edges_of_axis = np.concatenate(([start, stop], self.bin_edges[axis]))
+
+        # First we calculate the new bin edges of the axis
+        # We keep the old bin edges, but add the start and stop
+        axis = self.get_axis_number(axis)
+        new_bin_edges_of_axis = np.concatenate(([start, stop], self.bin_edges[axis]))
+        sort_map = np.argsort(new_bin_edges_of_axis)
+        inv_sort_map = np.argsort(sort_map)
+        new_bin_edges_of_axis = np.sort(new_bin_edges_of_axis)
+        new_bin_edges_of_axis = new_bin_edges_of_axis[inv_sort_map[0]:inv_sort_map[1] + 1]
+        # Remove duplicates just in case the start and stop were already bin edges
+        new_bin_edges_of_axis = np.unique(new_bin_edges_of_axis)
+
+        new_bin_edges = self.bin_edges.copy()
+        new_bin_edges[axis] = new_bin_edges_of_axis
+
+        new_hist = []
+        for i in range(len(new_bin_edges_of_axis) - 1):
+            new_hist.append(self._one_slice(new_bin_edges_of_axis[i], new_bin_edges_of_axis[i + 1], axis=axis))
+        new_hist = np.stack(new_hist, axis=axis)
+
+        return Histdd.from_histogram(new_hist, bin_edges=new_bin_edges, axis_names=self.axis_names)        
+
+    def slicesum(self, start, stop, axis):
         """Slices the histogram along axis, then sums over that slice, returning a d-1 dimensional histogram"""
         return self.slice(start, stop, axis).sum(axis)
 
