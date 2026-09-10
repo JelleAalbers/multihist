@@ -1,4 +1,5 @@
 from __future__ import division
+import warnings
 from copy import deepcopy
 from functools import reduce
 try:
@@ -238,10 +239,23 @@ class Hist1d(MultiHistBase):
         if stop is None:
             # Make a 1=bin slice
             stop = start
-        start_bin = max(0, self.get_axis_bin_index(start))
-        stop_bin = min(len(self.bin_centers) - 1,  # TODO: test off by one!
-                       self.get_axis_bin_index(stop))
-        new_bin_edges = self.bin_edges.copy()[start_bin:stop_bin + 2]   # TODO: Test off by one here!
+        # NB: a start/stop above the histogram range is deliberately tolerated.
+        # get_axis_bin_index returns the number of bins for such values -- one
+        # past the last bin -- and the min() below clips it, so a stop above
+        # the range slices to the end and a start above it gives an empty
+        # histogram. Values *below* the range raise instead, so max(0, ...)
+        # never triggers. get_axis_bin_index warns that it may raise for
+        # values above the range in a future version; that warning is not for
+        # our users, so it is silenced here. When it does start raising, keep
+        # this behaviour by giving _find_axis_bin_index a switch to skip that
+        # check, and calling it directly from here instead (which also makes
+        # this catch_warnings unnecessary).
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            start_bin = max(0, self.get_axis_bin_index(start))
+            stop_bin = min(len(self.bin_centers) - 1,
+                           self.get_axis_bin_index(stop))
+        new_bin_edges = self.bin_edges.copy()[start_bin:stop_bin + 2]
         return Hist1d.from_histogram(
             np.take(self.histogram, np.arange(start_bin, stop_bin + 1)),
             bin_edges=new_bin_edges,
@@ -574,11 +588,15 @@ class Histdd(MultiHistBase):
             # Make a 1=bin slice
             stop = start
         axis = self.get_axis_number(axis)
-        start_bin = max(0, self.get_axis_bin_index(start, axis))
-        stop_bin = min(len(self.bin_centers(axis)) - 1,  # TODO: test off by one!
-                       self.get_axis_bin_index(stop, axis))
+        # A start/stop above the range is deliberately tolerated here too;
+        # see the note in Hist1d.slice
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            start_bin = max(0, self.get_axis_bin_index(start, axis))
+            stop_bin = min(len(self.bin_centers(axis)) - 1,
+                           self.get_axis_bin_index(stop, axis))
         new_bin_edges = self.bin_edges.copy()
-        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
+        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
                                      bin_edges=new_bin_edges, axis_names=self.axis_names)
 
@@ -966,18 +984,35 @@ def poisson_1s_interval(k, fc=True):
 
 def _find_axis_bin_index(value, bin_edges, axis):
     """Returns index in bin_edges that contains value. Inclusive on both endpoints.
-    Raises CoordinateOutOfRangeException if value is out of range.
+    Raises CoordinateOutOfRangeException if value is below the range.
     The axis argument is only used for formatting this error message.
+
+    Values above the range return the number of bins, which is one too high to
+    be a valid bin index. This is a bug: it warns, and may raise
+    CoordinateOutOfRangeException in a future version. Callers that rely on it
+    (see Hist1d.slice) must clip the result themselves.
     """
+    # There is one bin less than there are bin edges
+    n_bins = len(bin_edges) - 1
     # The right bin edge of np.histogram is inclusive:
     if value == bin_edges[-1]:
-        # Minus two: one for bin edges rather than centers, one for 0-based indexing
-        return len(bin_edges) - 2
+        return n_bins - 1
     # For all other bins, it is exclusive.
     result = np.searchsorted(bin_edges, [value], side='right')[0] - 1
-    if not 0 <= result <= len(bin_edges) - 1:
+    if result < 0:
         raise CoordinateOutOfRangeException("Value %s is not in range (%s-%s) of axis %s" % (
             value, bin_edges[0], bin_edges[-1], axis))
+    if result >= n_bins:
+        # searchsorted returns n_bins for values beyond the last bin edge.
+        # Deliberately not formatting the value into the message: that would
+        # defeat the once-per-location warning filter when looking up many
+        # out-of-range values in a loop.
+        warnings.warn(
+            "Value above the last bin edge (%s) of axis %s: returning bin index %d, "
+            "which is out of range for the %d bins on this axis. multihist may raise "
+            "CoordinateOutOfRangeException here in a future version." % (
+                bin_edges[-1], axis, result, n_bins),
+            FutureWarning, stacklevel=3)
     return result
 
 

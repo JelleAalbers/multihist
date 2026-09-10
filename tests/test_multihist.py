@@ -1,13 +1,26 @@
 from __future__ import division
 import unittest
+import warnings
 from unittest import TestCase
 
 import numpy as np
 
-from multihist import Hist1d, Histdd, CAN_PLOT
+from multihist import Hist1d, Histdd, CAN_PLOT, CoordinateOutOfRangeException
 
 n_bins = 100
 test_range = (-3, 4)
+
+
+def without_warnings(fn, *args, **kwargs):
+    """Call fn, asserting it emits no FutureWarning, and return its result"""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = fn(*args, **kwargs)
+    unexpected = [str(w.message) for w in caught
+                  if issubclass(w.category, FutureWarning)]
+    if unexpected:
+        raise AssertionError("Unexpected FutureWarning(s): %s" % unexpected)
+    return result
 
 
 class TestHist1d(TestCase):
@@ -109,6 +122,50 @@ class TestHist1d(TestCase):
         n = len(data)
         self.assertAlmostEqual(m.std, np.std(data) * np.sqrt(n / (n - 1)))
 
+    def test_get_axis_bin_index(self):
+        m = Hist1d.from_histogram([1, 2, 3], [0, 1, 2, 3])
+
+        self.assertEqual(m.get_axis_bin_index(0), 0)
+        self.assertEqual(m.get_axis_bin_index(0.5), 0)
+        self.assertEqual(m.get_axis_bin_index(1), 1)
+        self.assertEqual(m.get_axis_bin_index(2.5), 2)
+
+        # The rightmost bin edge is inclusive, like in np.histogram
+        self.assertEqual(m.get_axis_bin_index(3), 2)
+
+        # Below the range: raises, as it always has
+        for value in (-0.5, -99):
+            self.assertRaises(CoordinateOutOfRangeException,
+                              m.get_axis_bin_index, value)
+
+        # Above the range: still returns an index that is one too high to be a
+        # bin, but now warns that this will become an exception
+        for value in (3.5, 99):
+            with self.assertWarns(FutureWarning):
+                index = m.get_axis_bin_index(value)
+            self.assertEqual(index, len(m.histogram))
+
+        # Whatever comes back must be a usable index into the histogram
+        for value in np.linspace(0, 3, 25):
+            index = m.get_axis_bin_index(value)
+            self.assertTrue(0 <= index < len(m.histogram),
+                            "Bin index %s out of range for %s bins" % (index, len(m.histogram)))
+
+    def test_slice_out_of_range(self):
+        m = Hist1d.from_histogram([10, 20, 30, 40, 50], [0, 1, 2, 3, 4, 5])
+
+        # Slicing is lenient above the range: a stop beyond the last bin edge
+        # slices up to the end, and a start beyond it gives an empty histogram.
+        # This is deliberate, so it must not warn.
+        self.assertEqual(without_warnings(m.slice, 0, 99).histogram.tolist(),
+                         [10, 20, 30, 40, 50])
+        self.assertEqual(without_warnings(m.slice, 2.5, 99).histogram.tolist(),
+                         [30, 40, 50])
+        self.assertEqual(without_warnings(m.slice, 99, 100).histogram.tolist(), [])
+
+        # Below the range it raises, as it always has
+        self.assertRaises(CoordinateOutOfRangeException, m.slice, -1, 2)
+
 
 test_range_2d = ((-1, 1), (-10, 10))
 test_bins_2d = 3
@@ -121,6 +178,49 @@ class TestHistdd(TestCase):
 
     def test_is_instance(self):
         self.assertIsInstance(self.m, Histdd)
+
+    def test_get_bin_indices(self):
+        m = Histdd.from_histogram(np.arange(6).reshape(2, 3),
+                                  bin_edges=[np.array([0, 1, 2]),
+                                             np.array([0, 1, 2, 3])],
+                                  axis_names=['x', 'y'])
+
+        self.assertEqual(m.get_bin_indices((0.5, 0.5)), (0, 0))
+        self.assertEqual(m.get_bin_indices((1.5, 2.5)), (1, 2))
+
+        # Rightmost bin edges are inclusive along every axis
+        self.assertEqual(m.get_bin_indices((2, 3)), (1, 2))
+
+        # The indices must actually index the histogram
+        self.assertEqual(m.histogram[m.get_bin_indices((1.5, 2.5))], 5)
+
+        # Below the range along either axis: raises
+        for values in [(-1, 1.5), (1.5, -1)]:
+            self.assertRaises(CoordinateOutOfRangeException,
+                              m.get_bin_indices, values)
+
+        # Above the range along either axis: warns, and still returns the
+        # index that blows up with an IndexError later
+        for values, bad in [((2.5, 1.5), (2, 1)), ((1.5, 99), (1, 3))]:
+            with self.assertWarns(FutureWarning):
+                self.assertEqual(m.get_bin_indices(values), bad)
+        with self.assertWarns(FutureWarning):
+            m.get_axis_bin_index(99, 'y')
+
+    def test_slice_out_of_range(self):
+        m = Histdd.from_histogram(np.arange(20).reshape(4, 5),
+                                  bin_edges=[np.array([0, 1, 2, 3, 4]),
+                                             np.array([0, 1, 2, 3, 4, 5])],
+                                  axis_names=['x', 'y'])
+
+        # As for Hist1d: lenient above the range without warning, raises below it
+        self.assertEqual(without_warnings(m.slice, 0, 99, axis=0).histogram.tolist(),
+                         m.histogram.tolist())
+        self.assertEqual(without_warnings(m.slice, 2, 99, axis=0).histogram.tolist(),
+                         m.histogram[2:].tolist())
+        self.assertEqual(without_warnings(m.slice, 99, 100, axis=0).histogram.shape,
+                         (0, 5))
+        self.assertRaises(CoordinateOutOfRangeException, m.slice, -1, 2, 0)
 
     def test_reflected_operators(self):
         m = self.m
