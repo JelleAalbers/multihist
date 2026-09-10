@@ -67,6 +67,32 @@ class TestHist1d(TestCase):
         self.assertEqual(m2.histogram[1], [0])
         self.assertEqual(m2.bin_edges.tolist(), m.bin_edges.tolist())
 
+    def test_reflected_operators(self):
+        # Regression test for non-commutative operator bug
+        m = Hist1d.from_histogram([1, 2, 3], [0, 1, 2, 3])
+
+        # Reflected operators must not be confused with their forward version
+        self.assertEqual((0 - m).histogram.tolist(), (-m).histogram.tolist())
+        self.assertEqual((0 - m).histogram.tolist(), [-1, -2, -3])
+        self.assertEqual((5 - m).histogram.tolist(), [4, 3, 2])
+        self.assertEqual((m - 5).histogram.tolist(), [-4, -3, -2])
+
+        self.assertEqual((12 / m).histogram.tolist(), [12, 6, 4])
+        self.assertEqual((12 // m).histogram.tolist(), [12, 6, 4])
+        self.assertEqual((7 % m).histogram.tolist(), [0, 1, 1])
+        self.assertEqual((2 ** m).histogram.tolist(), [2, 4, 8])
+        self.assertEqual((m ** 2).histogram.tolist(), [1, 4, 9])
+        self.assertEqual((16 >> m).histogram.tolist(), [8, 4, 2])
+        self.assertEqual((1 << m).histogram.tolist(), [2, 4, 8])
+
+        # Bin edges must survive the reflected operators
+        self.assertEqual((5 - m).bin_edges.tolist(), m.bin_edges.tolist())
+
+        # Commutative operators keep working
+        self.assertEqual((5 + m).histogram.tolist(), (m + 5).histogram.tolist())
+        self.assertEqual((5 * m).histogram.tolist(), (m * 5).histogram.tolist())
+
+
 test_range_2d = ((-1, 1), (-10, 10))
 test_bins_2d = 3
 
@@ -78,6 +104,22 @@ class TestHistdd(TestCase):
 
     def test_is_instance(self):
         self.assertIsInstance(self.m, Histdd)
+
+    def test_reflected_operators(self):
+        m = self.m
+        m.add([0, 0, 0], [0, 0, 5])
+
+        for h in (5 - m, m.__rsub__(5)):
+            self.assertIsInstance(h, Histdd)
+            self.assertEqual(h.histogram.tolist(),
+                             (5 - m.histogram).tolist())
+            self.assertEqual(h.axis_names, m.axis_names)
+        self.assertEqual((m - 5).histogram.tolist(),
+                         (m.histogram - 5).tolist())
+        self.assertEqual((0 - m).histogram.tolist(),
+                         (-m).histogram.tolist())
+        self.assertEqual((2 ** m).histogram.tolist(),
+                         (2 ** m.histogram).tolist())
 
     def test_add_data(self):
         m = self.m

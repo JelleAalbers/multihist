@@ -106,16 +106,14 @@ class MultiHistBase(object):
                 getattr(self.histogram, opname)(other),
                 self.bin_edges,
                 self.axis_names)
+        binop.__name__ = opname
         return binop
 
 for methodname in 'add sub mul div truediv floordiv mod divmod pow lshift rshift and or'.split():
-    dundername = '__%s__' % methodname
-    setattr(MultiHistBase,
-            dundername,
-            MultiHistBase._make_binop(dundername))
-    setattr(MultiHistBase,
-            '__r%s__' % methodname,
-            getattr(MultiHistBase, dundername))
+    for dundername in ('__%s__' % methodname, '__r%s__' % methodname):
+        setattr(MultiHistBase,
+                dundername,
+                MultiHistBase._make_binop(dundername))
 
 # Verbose alias
 MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
