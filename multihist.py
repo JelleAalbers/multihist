@@ -1,4 +1,5 @@
 from __future__ import division
+import warnings
 from copy import deepcopy
 from functools import reduce
 try:
@@ -106,16 +107,14 @@ class MultiHistBase(object):
                 getattr(self.histogram, opname)(other),
                 self.bin_edges,
                 self.axis_names)
+        binop.__name__ = opname
         return binop
 
 for methodname in 'add sub mul div truediv floordiv mod divmod pow lshift rshift and or'.split():
-    dundername = '__%s__' % methodname
-    setattr(MultiHistBase,
-            dundername,
-            MultiHistBase._make_binop(dundername))
-    setattr(MultiHistBase,
-            '__r%s__' % methodname,
-            getattr(MultiHistBase, dundername))
+    for dundername in ('__%s__' % methodname, '__r%s__' % methodname):
+        setattr(MultiHistBase,
+                dundername,
+                MultiHistBase._make_binop(dundername))
 
 # Verbose alias
 MultiHistBase.similar_blank_histogram = MultiHistBase.similar_blank_hist
@@ -201,14 +200,16 @@ class Hist1d(MultiHistBase):
         return np.average(self.bin_centers, weights=self.histogram)
 
     @property
-    def std(self, bessel_correction=True):
-        """Estimates std of underlying data, assuming each datapoint was exactly in the center of its bin."""
-        if bessel_correction:
-            n = self.n
-            bc = n / (n - 1)
-        else:
-            bc = 1
-        return np.sqrt(np.average((self.bin_centers - self.mean) ** 2, weights=self.histogram)) * bc
+    def std(self):
+        """Estimates std of underlying data, assuming each datapoint was exactly in the center of its bin.
+
+        The Bessel correction is applied, so this is an estimate of the std of
+        the underlying data (like np.std(data, ddof=1)), not of the histogram.
+        """
+        n = self.n
+        variance = np.average((self.bin_centers - self.mean) ** 2, weights=self.histogram)
+        # The Bessel correction applies to the variance, so the std gets its square root
+        return np.sqrt(variance * n / (n - 1))
 
     def get_axis_bin_index(self, value):
         """Returns index along axis of bin in histogram which contains value
@@ -238,10 +239,23 @@ class Hist1d(MultiHistBase):
         if stop is None:
             # Make a 1=bin slice
             stop = start
-        start_bin = max(0, self.get_axis_bin_index(start))
-        stop_bin = min(len(self.bin_centers) - 1,  # TODO: test off by one!
-                       self.get_axis_bin_index(stop))
-        new_bin_edges = self.bin_edges.copy()[start_bin:stop_bin + 2]   # TODO: Test off by one here!
+        # NB: a start/stop above the histogram range is deliberately tolerated.
+        # get_axis_bin_index returns the number of bins for such values -- one
+        # past the last bin -- and the min() below clips it, so a stop above
+        # the range slices to the end and a start above it gives an empty
+        # histogram. Values *below* the range raise instead, so max(0, ...)
+        # never triggers. get_axis_bin_index warns that it may raise for
+        # values above the range in a future version; that warning is not for
+        # our users, so it is silenced here. When it does start raising, keep
+        # this behaviour by giving _find_axis_bin_index a switch to skip that
+        # check, and calling it directly from here instead (which also makes
+        # this catch_warnings unnecessary).
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            start_bin = max(0, self.get_axis_bin_index(start))
+            stop_bin = min(len(self.bin_centers) - 1,
+                           self.get_axis_bin_index(stop))
+        new_bin_edges = self.bin_edges.copy()[start_bin:stop_bin + 2]
         return Hist1d.from_histogram(
             np.take(self.histogram, np.arange(start_bin, stop_bin + 1)),
             bin_edges=new_bin_edges,
@@ -574,11 +588,15 @@ class Histdd(MultiHistBase):
             # Make a 1=bin slice
             stop = start
         axis = self.get_axis_number(axis)
-        start_bin = max(0, self.get_axis_bin_index(start, axis))
-        stop_bin = min(len(self.bin_centers(axis)) - 1,  # TODO: test off by one!
-                       self.get_axis_bin_index(stop, axis))
+        # A start/stop above the range is deliberately tolerated here too;
+        # see the note in Hist1d.slice
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            start_bin = max(0, self.get_axis_bin_index(start, axis))
+            stop_bin = min(len(self.bin_centers(axis)) - 1,
+                           self.get_axis_bin_index(stop, axis))
         new_bin_edges = self.bin_edges.copy()
-        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]   # TODO: Test off by one here!
+        new_bin_edges[axis] = new_bin_edges[axis][start_bin:stop_bin + 2]
         return Histdd.from_histogram(np.take(self.histogram, np.arange(start_bin, stop_bin + 1), axis=axis),
                                      bin_edges=new_bin_edges, axis_names=self.axis_names)
 
@@ -604,8 +622,9 @@ class Histdd(MultiHistBase):
                                      axis_names=self.axis_names)
 
     def _simsalabim_slice(self, axis):
-        return [slice(None) if i != axis else np.newaxis
-                for i in range(self.dimensions)]
+        # NB: must be a tuple; numpy does not accept a list of slices as an index
+        return tuple([slice(None) if i != axis else np.newaxis
+                      for i in range(self.dimensions)])
 
     def normalize(self, axis):
         """Returns new histogram where all values along axis (in one bin of the other axes) sum to 1"""
@@ -613,7 +632,7 @@ class Histdd(MultiHistBase):
         sum_along_axis = np.sum(self.histogram, axis=axis)
         # Don't do anything for subspaces without any entries -- this avoids nans everywhere
         sum_along_axis[sum_along_axis == 0] = 1
-        hist = self.histogram / sum_along_axis[tuple(self._simsalabim_slice(axis))]
+        hist = self.histogram / sum_along_axis[self._simsalabim_slice(axis)]
         return Histdd.from_histogram(hist,
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
@@ -695,28 +714,6 @@ class Histdd(MultiHistBase):
         else:
             new_hist = Histdd
         return new_hist.from_histogram(histogram=avg_hist,
-                                       bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
-                                       axis_names=self.axis_names_without(axis))
-
-    def std(self, axis):
-        """Returns d-1 dimensional histogram of (estimated) std value along axis
-        NB this is very different from just std of the histogram values (which describe bin counts)
-        """
-        def weighted_std(values, weights, axis):
-            # Stolen from http://stackoverflow.com/questions/2413522
-            average = np.average(values, weights=weights, axis=axis)
-            average = average[self._simsalabim_slice(axis)]
-            variance = np.average((values-average)**2, weights=weights, axis=axis)
-            return np.sqrt(variance)
-
-        axis = self.get_axis_number(axis)
-        std_hist = weighted_std(self.all_axis_bin_centers(axis),
-                                weights=self.histogram, axis=axis)
-        if self.dimensions == 2:
-            new_hist = Hist1d
-        else:
-            new_hist = Histdd
-        return new_hist.from_histogram(histogram=std_hist,
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
@@ -987,18 +984,35 @@ def poisson_1s_interval(k, fc=True):
 
 def _find_axis_bin_index(value, bin_edges, axis):
     """Returns index in bin_edges that contains value. Inclusive on both endpoints.
-    Raises CoordinateOutOfRangeException if value is out of range.
+    Raises CoordinateOutOfRangeException if value is below the range.
     The axis argument is only used for formatting this error message.
+
+    Values above the range return the number of bins, which is one too high to
+    be a valid bin index. This is a bug: it warns, and may raise
+    CoordinateOutOfRangeException in a future version. Callers that rely on it
+    (see Hist1d.slice) must clip the result themselves.
     """
+    # There is one bin less than there are bin edges
+    n_bins = len(bin_edges) - 1
     # The right bin edge of np.histogram is inclusive:
     if value == bin_edges[-1]:
-        # Minus two: one for bin edges rather than centers, one for 0-based indexing
-        return len(bin_edges) - 2
+        return n_bins - 1
     # For all other bins, it is exclusive.
     result = np.searchsorted(bin_edges, [value], side='right')[0] - 1
-    if not 0 <= result <= len(bin_edges) - 1:
+    if result < 0:
         raise CoordinateOutOfRangeException("Value %s is not in range (%s-%s) of axis %s" % (
             value, bin_edges[0], bin_edges[-1], axis))
+    if result >= n_bins:
+        # searchsorted returns n_bins for values beyond the last bin edge.
+        # Deliberately not formatting the value into the message: that would
+        # defeat the once-per-location warning filter when looking up many
+        # out-of-range values in a loop.
+        warnings.warn(
+            "Value above the last bin edge (%s) of axis %s: returning bin index %d, "
+            "which is out of range for the %d bins on this axis. multihist may raise "
+            "CoordinateOutOfRangeException here in a future version." % (
+                bin_edges[-1], axis, result, n_bins),
+            FutureWarning, stacklevel=3)
     return result
 
 
