@@ -92,6 +92,23 @@ class TestHist1d(TestCase):
         self.assertEqual((5 + m).histogram.tolist(), (m + 5).histogram.tolist())
         self.assertEqual((5 * m).histogram.tolist(), (m * 5).histogram.tolist())
 
+    def test_std(self):
+        m = Hist1d.from_histogram([1, 2, 1], [0, 1, 2, 3])
+
+        # The histogram describes this data (each point at its bin center):
+        data = [0.5, 1.5, 1.5, 2.5]
+        self.assertEqual(m.n, len(data))
+        self.assertAlmostEqual(m.mean, np.mean(data))
+
+        # Hist1d.std applies the Bessel correction, so it estimates the std of
+        # the underlying data: that means ddof=1, not ddof=0.
+        self.assertAlmostEqual(m.std, np.std(data, ddof=1))
+
+        # Explicitly: the correction is sqrt(n/(n-1)) on the std,
+        # i.e. n/(n-1) on the variance
+        n = len(data)
+        self.assertAlmostEqual(m.std, np.std(data) * np.sqrt(n / (n - 1)))
+
 
 test_range_2d = ((-1, 1), (-10, 10))
 test_bins_2d = 3

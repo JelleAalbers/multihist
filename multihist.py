@@ -199,14 +199,16 @@ class Hist1d(MultiHistBase):
         return np.average(self.bin_centers, weights=self.histogram)
 
     @property
-    def std(self, bessel_correction=True):
-        """Estimates std of underlying data, assuming each datapoint was exactly in the center of its bin."""
-        if bessel_correction:
-            n = self.n
-            bc = n / (n - 1)
-        else:
-            bc = 1
-        return np.sqrt(np.average((self.bin_centers - self.mean) ** 2, weights=self.histogram)) * bc
+    def std(self):
+        """Estimates std of underlying data, assuming each datapoint was exactly in the center of its bin.
+
+        The Bessel correction is applied, so this is an estimate of the std of
+        the underlying data (like np.std(data, ddof=1)), not of the histogram.
+        """
+        n = self.n
+        variance = np.average((self.bin_centers - self.mean) ** 2, weights=self.histogram)
+        # The Bessel correction applies to the variance, so the std gets its square root
+        return np.sqrt(variance * n / (n - 1))
 
     def get_axis_bin_index(self, value):
         """Returns index along axis of bin in histogram which contains value
@@ -602,8 +604,9 @@ class Histdd(MultiHistBase):
                                      axis_names=self.axis_names)
 
     def _simsalabim_slice(self, axis):
-        return [slice(None) if i != axis else np.newaxis
-                for i in range(self.dimensions)]
+        # NB: must be a tuple; numpy does not accept a list of slices as an index
+        return tuple([slice(None) if i != axis else np.newaxis
+                      for i in range(self.dimensions)])
 
     def normalize(self, axis):
         """Returns new histogram where all values along axis (in one bin of the other axes) sum to 1"""
@@ -611,7 +614,7 @@ class Histdd(MultiHistBase):
         sum_along_axis = np.sum(self.histogram, axis=axis)
         # Don't do anything for subspaces without any entries -- this avoids nans everywhere
         sum_along_axis[sum_along_axis == 0] = 1
-        hist = self.histogram / sum_along_axis[tuple(self._simsalabim_slice(axis))]
+        hist = self.histogram / sum_along_axis[self._simsalabim_slice(axis)]
         return Histdd.from_histogram(hist,
                                      bin_edges=self.bin_edges,
                                      axis_names=self.axis_names)
@@ -693,28 +696,6 @@ class Histdd(MultiHistBase):
         else:
             new_hist = Histdd
         return new_hist.from_histogram(histogram=avg_hist,
-                                       bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
-                                       axis_names=self.axis_names_without(axis))
-
-    def std(self, axis):
-        """Returns d-1 dimensional histogram of (estimated) std value along axis
-        NB this is very different from just std of the histogram values (which describe bin counts)
-        """
-        def weighted_std(values, weights, axis):
-            # Stolen from http://stackoverflow.com/questions/2413522
-            average = np.average(values, weights=weights, axis=axis)
-            average = average[self._simsalabim_slice(axis)]
-            variance = np.average((values-average)**2, weights=weights, axis=axis)
-            return np.sqrt(variance)
-
-        axis = self.get_axis_number(axis)
-        std_hist = weighted_std(self.all_axis_bin_centers(axis),
-                                weights=self.histogram, axis=axis)
-        if self.dimensions == 2:
-            new_hist = Hist1d
-        else:
-            new_hist = Histdd
-        return new_hist.from_histogram(histogram=std_hist,
                                        bin_edges=itemgetter(*self.other_axes(axis))(self.bin_edges),
                                        axis_names=self.axis_names_without(axis))
 
